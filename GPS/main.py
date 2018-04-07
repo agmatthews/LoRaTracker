@@ -3,13 +3,14 @@ from network import LoRa
 from pytrack import Pytrack
 from L76GNSS import L76GNSS
 from machine import Timer
+from machine import WDT
+from machine import SD
 import socket
 import time
 import pycom
 import utime
 import _thread
 import struct
-from machine import SD
 import os
 
 # configuration
@@ -17,11 +18,13 @@ my_ID = 'GPS1' # unique id of this unit - 4 char string
 sendInterval = 5 # send data every 5 seconds
 ledInterval = 1000 # update LED every 1000usec
 dataStructure = '4sBffffffl' # structure for packing data into bytes to send to base unit
+WDtimeout = int(sendInterval * 2.1 * 1000) # use watchdog timer to reset the board if it does not update reguarly
 
 # instantiate libraries
 pytrack = Pytrack()
 l76 = L76GNSS(pytrack)
 gps = MicropyGPS(location_formatting='dd') # return decimal degrees from GPS
+wdt = WDT(timeout=WDtimeout) # enable a Watchdog timer with a timeout of 2s
 
 # instantiate variables
 msgSent = False
@@ -102,7 +105,11 @@ s.setblocking(False)
 
 # main loop
 while True:
-    if gps.fix_stat > 0:
+    # feed the watch dog timer
+    wdt.feed()
+    # check we have GPS data and process it if we do
+    print(gps.time_since_fix())
+    if gps.fix_stat > 0 and gps.time_since_fix()<10 and gps.time_since_fix()>=0:
         # Got GPS data so send it to base via LoRa
         print('Sending...')
         # get coordinates
