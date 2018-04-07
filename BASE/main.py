@@ -89,7 +89,7 @@ sd = SD()
 os.mount(sd, '/sd')
 # start new log file with headers
 with open("/sd/log.csv", 'w') as Log_file:
-    Log_file.write('remote_ID,GPSFix,latitude,longitude,rssi\n')
+    Log_file.write('remote_ID,GPSFix,latitude,longitude,voltage,rssi\n')
 
 print ("Starting Webserver")
 mws = MicroWebSrv(webPath="/sd") # TCP port 80 and files in /sd
