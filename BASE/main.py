@@ -6,6 +6,7 @@ import socket
 from microWebSrv import MicroWebSrv
 from mqtt import MQTTClient
 import time
+import _thread
 import struct
 import gc
 import ujson
@@ -14,6 +15,7 @@ import os
 
 # configuration
 my_ID = 'BSE1' # unique id of this unit - 4 char string
+receiveInterval = 2 # send data every 2 seconds
 ledInterval = 1000 # update LED every 1000usec
 WLAN_SSID = 'lerdy'
 WLAN_PWD = 'lerdy0519'
@@ -28,6 +30,35 @@ speed = None
 course = None
 remote_ID = b''
 vBatt = 0.0
+msgReceived = False
+
+def LED_thread():
+# continuously update the status of the unit via the onboard LED
+    global gps
+    global msgReceived
+    global ledInterval
+    ledColour = 0x000000
+
+    while True:
+        if GPSFix > 0:
+            # GPS OK so set LED to Green
+            ledColour = 0x001100
+        else:
+            # GPS BAD so set LED to RED
+            ledColour = 0x110000
+
+        if msgReceived == True:
+            # Just Rx a message so set the LED to Purple
+            ledColour = 0x110011
+            #reset the msg flag as we have actioned it
+            msgReceived = False
+
+        pycom.rgbled(ledColour)
+        # Hold the set colour for 90% of the ledInterval
+        time.sleep_ms(int(ledInterval * 0.9))
+        # Blink LED to black for 10% of the ledInterval to indicate code is still running
+        pycom.rgbled(0x000000)
+        time.sleep_ms(int(ledInterval * 0.1))
 
 def sub_cb(topic, msg):
    print(msg)
@@ -51,6 +82,7 @@ for net in nets:
 print ("Starting LED")
 pycom.heartbeat(False)
 pycom.rgbled(0x000011)
+_thread.start_new_thread(LED_thread, ())
 
 print ("Starting SD Card")
 sd = SD()
@@ -83,19 +115,23 @@ while True:
     stats = lora.stats()
     GPSFix = False
     if len(databytes)>4:
+        msgReceived = True
         remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime = struct.unpack(dataStructure, databytes)
         if GPSFix:
-            print(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+            # print received data to serial port / screen
+            print(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+            # make a geoJSON package of the recived data
             geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {}}
-            with open("/sd/log.csv", 'a') as Log_file:
-                Log_file.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(stats.rssi) + '\n')
+            # write geoJSON data to a geoJSON file on SD card in overwrite mode
             with open("/sd/gps.json", 'w') as JSON_file:
                 JSON_file.write(ujson.dumps(geoJSON))
+            # write received data to log file in CSV format in append mode
+            with open("/sd/log.csv", 'a') as Log_file:
+                Log_file.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + '\n')
+            # send data to MQTT server
             #mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
-            pycom.rgbled(0x001100)
         else:
-            print(remote_ID + ",NOGPS," + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + str(GPSdatetime) + ',' + str(stats.rssi))
-            pycom.rgbled(0x110000)
-    time.sleep(1.5)
-    pycom.rgbled(0x000000)
-    time.sleep(0.5)
+            # print received data to serial port / screen
+            print(remote_ID + ",NOGPS," + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+
+    time.sleep(receiveInterval)
