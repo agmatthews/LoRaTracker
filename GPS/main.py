@@ -71,6 +71,14 @@ def LED_thread():
         pycom.rgbled(0x000000)
         time.sleep_ms(int(ledInterval * 0.1))
 
+def readBattery():
+    try:
+        volts = pytrack.read_battery_voltage()
+    except Exception as e:
+        print ('Battery read error')
+        volts = 0
+    return volts
+
 # Startup
 print ('Starting GPS (LoRaTracker)')
 print ('   ID: ' + str(my_ID))
@@ -110,7 +118,7 @@ while True:
         altitude = gps.altitude
         speed = gps.speed[2] #km/h
         course = gps.course
-        vBatt = pytrack.read_battery_voltage()
+        vBatt = readBattery()
         # get date and time and make an POSIX EPOCH string from it
         GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
         # pack the data into a defined format for tx via lora
@@ -126,7 +134,7 @@ while True:
         print('Pinging...')
         # get date and time and make an POSIX EPOCH string from it
         GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
-        vBatt = pytrack.read_battery_voltage()
+        vBatt = readBattery()
         # pack the data into a defined format for tx via lora
         databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, 0, 0, 0, 0, 0, vBatt, GPSdatetime)
         # send the data via LoRa

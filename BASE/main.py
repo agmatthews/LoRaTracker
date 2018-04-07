@@ -113,8 +113,8 @@ print ("Waiting for data")
 while True:
     databytes = s.recv(256)
     stats = lora.stats()
-    GPSFix = False
     if len(databytes)>4:
+        GPSFix = False
         msgReceived = True
         remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime = struct.unpack(dataStructure, databytes)
         if GPSFix:
