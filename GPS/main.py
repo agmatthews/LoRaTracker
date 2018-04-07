@@ -89,7 +89,6 @@ os.mount(sd, '/sd')
 
 print ("Starting GPS")
 _thread.start_new_thread(GPS_thread, ())
-gps.start_logging('/sd/GPS_NMEA_log.txt')
 
 print ("Starting LED")
 pycom.heartbeat(False)
@@ -127,6 +126,9 @@ while True:
         s.send(databytes)
         # set msgSent flag to True
         msgSent = True
+        # write received data to log file in CSV format in append mode
+        with open("/sd/GPSlog.csv", 'a') as Log_file:
+            Log_file.write(my_ID + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
         # print current data to serial port for debug purposes
         print(str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
     else:
