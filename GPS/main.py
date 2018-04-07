@@ -13,17 +13,18 @@ from machine import SD
 import os
 
 # configuration
-my_ID = 'GPS1' # unique id of this unit - integer
+my_ID = 'GPS1' # unique id of this unit - 4 char string
 
 # instantiate libraries
 pytrack = Pytrack()
 l76 = L76GNSS(pytrack)
-gps = MicropyGPS(location_formatting='dd')
+gps = MicropyGPS(location_formatting='dd') # return decimal degrees from GPS
 
 def GPS_thread():
 # continuously reads data from I2C GPS and passes it to micropyGPS for decoding
+    global gps
+    global l76
     while True:
-        global gps
         NMEAdata = l76._read()
         for c in NMEAdata:
             gps.update(chr(c))
@@ -34,7 +35,8 @@ def DecTime(timeVal):
     return(time_d)
 
 # Startup
-print ("B-GPS (GPSTest)" + str(my_ID))
+print ('Starting GPS (LoRaTracker)')
+print ('   ID: ' + str(my_ID))
 
 print ("Starting LED")
 pycom.heartbeat(False)
