@@ -16,6 +16,7 @@ import os
 my_ID = 'GPS1' # unique id of this unit - 4 char string
 sendInterval = 5 # send data every 5 seconds
 ledInterval = 1000 # update LED every 1000usec
+dataStructure = '4sBffffffl' # structure for packing data into bytes to send to base unit
 
 # instantiate libraries
 pytrack = Pytrack()
@@ -113,7 +114,7 @@ while True:
         # get date and time and make an POSIX EPOCH string from it
         GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
         # pack the data into a defined format for tx via lora
-        databytes = struct.pack('4sBffffffl', my_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime)
+        databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime)
         # send the data via LoRa
         s.send(databytes)
         # set msgSent flag to True
@@ -127,10 +128,10 @@ while True:
         GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
         vBatt = pytrack.read_battery_voltage()
         # pack the data into a defined format for tx via lora
-        databytes = struct.pack('4sBffffffl', my_ID, gps.fix_stat, 0, 0, 0, 0, 0, vBatt, GPSdatetime)
+        databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, 0, 0, 0, 0, 0, vBatt, GPSdatetime)
         # send the data via LoRa
         s.send(databytes)
         # set msgSent flag to False
-        msgSent = False
+        msgSent = True
 
     time.sleep(sendInterval) # wait sendInterval seconds

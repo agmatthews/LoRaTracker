@@ -12,8 +12,12 @@ import ujson
 from machine import SD
 import os
 
+# configuration
+my_ID = 'BSE1' # unique id of this unit - 4 char string
+ledInterval = 1000 # update LED every 1000usec
 WLAN_SSID = 'lerdy'
 WLAN_PWD = 'lerdy0519'
+dataStructure = '4sBffffffl' # structure for packing data into bytes to send
 
 GPSFix = False
 GPSdatetime = None
@@ -23,7 +27,7 @@ altitude  = None
 speed = None
 course = None
 remote_ID = b''
-my_ID = 'BSE1'
+vBatt = 0.0
 
 def sub_cb(topic, msg):
    print(msg)
@@ -79,7 +83,7 @@ while True:
     stats = lora.stats()
     GPSFix = False
     if len(databytes)>4:
-        remote_ID, GPSFix, lat, lon, altitude, speed, course, GPSdatetime = struct.unpack("4sBfffffl", databytes)
+        remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime = struct.unpack(dataStructure, databytes)
         if GPSFix:
             print(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
             geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {}}
