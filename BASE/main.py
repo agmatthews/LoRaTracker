@@ -31,6 +31,7 @@ course = None
 remote_ID = b''
 vBatt = 0.0
 msgReceived = False
+geoJSON = {}
 
 def LED_thread():
 # continuously update the status of the unit via the onboard LED
@@ -63,6 +64,12 @@ def LED_thread():
 def sub_cb(topic, msg):
    print(msg)
 
+def WWW_routes():
+    global geoJSON
+    def _geojson(client, response):
+        response.WriteResponseJSONOk(geoJSON)
+    return [('/gps.json', 'GET', _geojson)]
+
 print ('Starting A-BASE')
 print ('   ID: ' + str(my_ID))
 
@@ -92,7 +99,8 @@ with open("/sd/log.csv", 'w') as Log_file:
     Log_file.write('remote_ID,GPSFix,latitude,longitude,voltage,rssi\n')
 
 print ("Starting Webserver")
-mws = MicroWebSrv(webPath="/sd") # TCP port 80 and files in /sd
+routes = WWW_routes()
+mws = MicroWebSrv(routeHandlers=routes, webPath="/sd") # TCP port 80 and files in /sd
 gc.collect()
 mws.Start()         # Starts server in a new thread
 gc.collect()
@@ -121,10 +129,7 @@ while True:
             # print received data to serial port / screen
             print(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
             # make a geoJSON package of the recived data
-            geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {}}
-            # write geoJSON data to a geoJSON file on SD card in overwrite mode
-            with open("/sd/gps.json", 'w') as JSON_file:
-                JSON_file.write(ujson.dumps(geoJSON))
+            geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {"remote_ID": str(remote_ID.decode()), "altitude": str(altitude), "speed": str(speed), "course": str(course), "battery": str(vBatt), "RSSI": str(stats.rssi), "datetime": str(GPSdatetime)}}
             # write received data to log file in CSV format in append mode
             with open("/sd/log.csv", 'a') as Log_file:
                 Log_file.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + '\n')
