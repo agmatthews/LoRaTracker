@@ -805,9 +805,9 @@ class MicropyGPS(object):
     supported_sentences = {'GPRMC': gprmc, 'GLRMC': gprmc,
                            'GPGGA': gpgga, 'GLGGA': gpgga,
                            'GPVTG': gpvtg, 'GLVTG': gpvtg,
-                           'GPGSA': gpgsa, 'GLGSA': gpgsa,
+                           'GPGSA': gpgsa, 'GLGSA': gpgsa, 'GNGSA': gpgsa,
                            'GPGSV': gpgsv, 'GLGSV': gpgsv,
-                           'GPGLL': gpgll, 'GLGLL': gpgll,
+                           'GPGLL': gpgll, 'GLGLL': gpgll, 'GNGLL': gpgll,
                            'GNGGA': gpgga, 'GNRMC': gprmc,
                            'GNVTG': gpvtg,
                           }
