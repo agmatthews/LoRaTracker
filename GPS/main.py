@@ -28,6 +28,7 @@ wdt = WDT(timeout=WDtimeout) # enable a Watchdog timer with a timeout of 2s
 
 # instantiate variables
 msgSent = False
+time_since_fix = 0
 
 def GPS_thread():
 # continuously reads data from I2C GPS and passes it to micropyGPS for decoding
@@ -36,7 +37,9 @@ def GPS_thread():
     while True:
         NMEAdata = l76._read()
         for c in NMEAdata:
-            gps.update(chr(c))
+            result = gps.update(chr(c))
+            #if (result != None):
+                #print (result)
 
 def LED_thread():
 # continuously update the status of the unit via the onboard LED
@@ -53,8 +56,8 @@ def LED_thread():
             # GPS BAD so set LED to RED
             ledColour = 0x110000
 
-        if gps.time_since_fix()>5000:
-            # No GPS fix for last 5 seconds so set LED to Orange
+        if gps.time_since_fix()>10:
+            # No GPS fix for last 10 seconds so set LED to Orange
             ledColour = 0x110500
 
         if gps.clean_sentences < 1:
@@ -107,9 +110,11 @@ s.setblocking(False)
 while True:
     # feed the watch dog timer
     wdt.feed()
+    time_since_fix = int(gps.time_since_fix())
+    if (time_since_fix is None):
+        time_since_fix = -1
     # check we have GPS data and process it if we do
-    print(gps.time_since_fix())
-    if gps.fix_stat > 0 and gps.time_since_fix()<10 and gps.time_since_fix()>=0:
+    if gps.fix_stat > 0 and time_since_fix < 10 and time_since_fix >= 0:
         # Got GPS data so send it to base via LoRa
         print('Sending...')
         # get coordinates
