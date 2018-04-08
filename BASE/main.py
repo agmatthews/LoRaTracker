@@ -2,15 +2,15 @@ import pycom
 import machine
 from network import LoRa
 from network import WLAN
-import socket
+from machine import SD
 from microWebSrv import MicroWebSrv
 from mqtt import MQTTClient
+import socket
 import time
 import _thread
 import struct
 import gc
 import ujson
-from machine import SD
 import os
 
 # configuration
@@ -61,8 +61,9 @@ def LED_thread():
         pycom.rgbled(0x000000)
         time.sleep_ms(int(ledInterval * 0.1))
 
-def sub_cb(topic, msg):
-   print(msg)
+def mqtt_callback(topic, msg):
+    # this subroutine would process any message that comes back from MQTT server
+    print(msg)
 
 def WWW_routes():
     global geoJSON
@@ -112,7 +113,7 @@ s.setblocking(False)
 
 print ('Starting MQTT')
 mqtt = MQTTClient(my_ID, "io.adafruit.com",user="agmatthews", password="d9ee3d9d1d5a4f3b860d96beaa9d3413", port=1883)
-mqtt.set_callback(sub_cb)
+mqtt.set_callback(mqtt_callback)
 mqtt.connect()
 mqtt.subscribe(topic="agmatthews/feeds/LORAtest")
 
@@ -121,7 +122,7 @@ print ("Waiting for data")
 while True:
     databytes = s.recv(256)
     stats = lora.stats()
-    if len(databytes)>4:
+    if len(databytes)==36:
         GPSFix = False
         msgReceived = True
         remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime = struct.unpack(dataStructure, databytes)
