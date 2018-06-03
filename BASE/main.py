@@ -64,6 +64,7 @@ def LED_thread():
 
 def RockAir_thread():
 # periodically send data to TracPlus via RockAir via Serial Port
+# TESTING FTDI port /dev/cu.usbserial-A800JWP3
     global GPSFix
     global RockAirInterval
 
@@ -71,9 +72,13 @@ def RockAir_thread():
         if GPSFix > 0:
             # GPS OK so send A message
             #
+            print ("GPS OK so send a message")
+
         else:
             # GPS BAD so don't send message
             #
+            print ("GPS BAD so don't send message")
+
         time.sleep_ms(int(RockAirInterval))
 
 def mqtt_callback(topic, msg):
@@ -106,6 +111,9 @@ print ("Starting LED")
 pycom.heartbeat(False)
 pycom.rgbled(0x000011)
 _thread.start_new_thread(LED_thread, ())
+
+print ("Starting RockAir")
+_thread.start_new_thread(RockAir_thread, ())
 
 print ("Starting SD Card")
 sd = SD()
