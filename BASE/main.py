@@ -20,6 +20,7 @@ ledInterval = 1000 # update LED every 1000usec
 WLAN_SSID = 'lerdy'
 WLAN_PWD = 'lerdy0519'
 dataStructure = '4sBffffffl' # structure for packing data into bytes to send
+RockAirInterval = 2 * 60 * 1000  # Send data to TracPlus every (2 * 60 * 1000)usec = 2 minutes
 
 GPSFix = False
 GPSdatetime = None
@@ -60,6 +61,20 @@ def LED_thread():
         # Blink LED to black for 10% of the ledInterval to indicate code is still running
         pycom.rgbled(0x000000)
         time.sleep_ms(int(ledInterval * 0.1))
+
+def RockAir_thread():
+# periodically send data to TracPlus via RockAir via Serial Port
+    global GPSFix
+    global RockAirInterval
+
+    while True:
+        if GPSFix > 0:
+            # GPS OK so send A message
+            #
+        else:
+            # GPS BAD so don't send message
+            #
+        time.sleep_ms(int(RockAirInterval))
 
 def mqtt_callback(topic, msg):
     # this subroutine would process any message that comes back from MQTT server
