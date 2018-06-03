@@ -35,7 +35,7 @@ geoJSON = {}
 
 def LED_thread():
 # continuously update the status of the unit via the onboard LED
-    global gps
+    global GPSFix
     global msgReceived
     global ledInterval
     ledColour = 0x000000
