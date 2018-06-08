@@ -1,3 +1,4 @@
+#
 from micropyGPS import MicropyGPS
 from network import LoRa
 from pytrack import Pytrack
@@ -12,12 +13,14 @@ import utime
 import _thread
 import struct
 import os
+from checksum import check_checksum
+from checksum import calc_checksum
 
 # configuration
-my_ID = 'GPS1' # unique id of this unit - 4 char string
+my_ID = '$RM1' # unique id of this unit - 4 char string starting with $
 sendInterval = 5 # send data every 5 seconds
 ledInterval = 1000 # update LED every 1000usec
-dataStructure = '4sBffffffl' # structure for packing data into bytes to send to base unit
+dataStructure = '4sBffffffl1s' # structure for packing data into bytes to send to base unit with crc
 WDtimeout = int(sendInterval * 2.1 * 1000) # use watchdog timer to reset the board if it does not update reguarly
 
 # instantiate libraries
@@ -29,6 +32,7 @@ wdt = WDT(timeout=WDtimeout) # enable a Watchdog timer with a timeout of 2s
 # instantiate variables
 msgSent = False
 time_since_fix = 0
+crc = 0
 
 def GPS_thread():
 # continuously reads data from I2C GPS and passes it to micropyGPS for decoding
@@ -132,9 +136,13 @@ while True:
         vBatt = readBattery()
         # get date and time and make an POSIX EPOCH string from it
         GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
-        # pack the data into a defined format for tx via lora
-        databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime)
-        # send the data via LoRa
+        # pack the data into a defined format for tx via lora without CRC
+        databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime,'*')
+        # calculate CRC
+        crc = calc_checksum(databytes)
+        # add the crc to the databytes
+        databytes = databytes+ str(hex(crc))# send the data via LoRa
+        print(check_checksum(databytes))
         s.send(databytes)
         # set msgSent flag to True
         msgSent = True

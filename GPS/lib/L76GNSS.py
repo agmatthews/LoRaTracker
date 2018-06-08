@@ -1,3 +1,4 @@
+#
 class L76GNSS:
 
     GPS_I2CADDR = const(0x10)
