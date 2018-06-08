@@ -115,12 +115,16 @@ _thread.start_new_thread(LED_thread, ())
 print ("Starting RockAir")
 _thread.start_new_thread(RockAir_thread, ())
 
-print ("Starting SD Card")
-sd = SD()
-os.mount(sd, '/sd')
+print ("Starting UART1")
+uart1 = UART(1, 115300, bits=8, parity=None, stop=1)
+uart1.init(baudrate=115200, bits=8, parity=None, stop=1)
+
+#print ("Starting SD Card")
+#sd = SD()
+#os.mount(sd, '/sd')
 # start new log file with headers
-with open("/sd/log.csv", 'w') as Log_file:
-    Log_file.write('remote_ID,GPSFix,latitude,longitude,voltage,rssi\n')
+#with open("/sd/log.csv", 'w') as Log_file:
+#    Log_file.write('remote_ID,GPSFix,latitude,longitude,voltage,rssi\n')
 
 print ("Starting Webserver")
 routes = WWW_routes()
@@ -155,10 +159,11 @@ while True:
             # make a geoJSON package of the recived data
             geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {"remote_ID": str(remote_ID.decode()), "altitude": str(altitude), "speed": str(speed), "course": str(course), "battery": str(vBatt), "RSSI": str(stats.rssi), "datetime": str(GPSdatetime)}}
             # write received data to log file in CSV format in append mode
-            with open("/sd/log.csv", 'a') as Log_file:
-                Log_file.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + '\n')
+            #with open("/sd/log.csv", 'a') as Log_file:
+            #    Log_file.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + '\n')
             # send data to MQTT server
             #mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+            uart1.write(':' + str(vBatt) + ',' + str(gps.timestamp))
         else:
             # print received data to serial port / screen
             print(remote_ID + ",NOGPS," + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
