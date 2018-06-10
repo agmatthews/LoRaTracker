@@ -22,6 +22,7 @@ sendInterval = 5 # send data every 5 seconds
 ledInterval = 1000 # update LED every 1000usec
 dataStructure = '4sBffffffl1s' # structure for packing data into bytes to send to base unit with crc
 WDtimeout = int(sendInterval * 2.1 * 1000) # use watchdog timer to reset the board if it does not update reguarly
+staleGPStime = 10 # after 10 seconds consider the GPS stale
 
 # instantiate libraries
 pytrack = Pytrack()
@@ -118,7 +119,7 @@ while True:
     if (time_since_fix is None):
         time_since_fix = -1
     # check we have GPS data and process it if we do
-    if gps.fix_stat > 0 and time_since_fix < 10 and time_since_fix >= 0:
+    if gps.fix_stat > 0 and time_since_fix < staleGPStime and time_since_fix >= 0:
         # Got GPS data so send it to base via LoRa
         print('OK Fix - Sending...')
         # get coordinates
@@ -150,15 +151,20 @@ while True:
         with open("/sd/GPSlog.csv", 'a') as Log_file:
             Log_file.write(my_ID + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
         # print current data to serial port for debug purposes
-        print(str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
+        print('TX:' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
     else:
         # no GPS data so just send a ping packet
         print('No Fix - Pinging...')
         # get date and time and make an POSIX EPOCH string from it
         GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
+        # read the battery volts
         vBatt = readBattery()
+        #check why we are here and calculate gps status
+        gpsStat = gps.fix_stat
+        if time_since_fix > staleGPStime or time_since_fix < 0:
+            gpsStat = 0
         # pack the data into a defined format for tx via lora
-        databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, 0, 0, 0, 0, 0, vBatt, GPSdatetime,'*')
+        databytes = struct.pack(dataStructure, my_ID, gpsStat, 0, 0, 0, 0, 0, vBatt, GPSdatetime,'*')
         # calculate CRC
         crc = calc_checksum(databytes)
         # add the crc to the databytes
@@ -167,5 +173,4 @@ while True:
         s.send(databytes)
         # set msgSent flag to False
         msgSent = True
-    print(databytes)
     time.sleep(sendInterval) # wait sendInterval seconds
