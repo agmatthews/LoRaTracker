@@ -120,7 +120,7 @@ while True:
     # check we have GPS data and process it if we do
     if gps.fix_stat > 0 and time_since_fix < 10 and time_since_fix >= 0:
         # Got GPS data so send it to base via LoRa
-        print('Sending...')
+        print('OK Fix - Sending...')
         # get coordinates
         lat = gps.latitude[0]
         lon = gps.longitude[0]
@@ -141,8 +141,8 @@ while True:
         # calculate CRC
         crc = calc_checksum(databytes)
         # add the crc to the databytes
-        databytes = databytes+ str(hex(crc))# send the data via LoRa
-        print(check_checksum(databytes))
+        databytes = databytes + str(hex(crc))
+        # send the data via LoRa
         s.send(databytes)
         # set msgSent flag to True
         msgSent = True
@@ -153,15 +153,19 @@ while True:
         print(str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
     else:
         # no GPS data so just send a ping packet
-        print('Pinging...')
+        print('No Fix - Pinging...')
         # get date and time and make an POSIX EPOCH string from it
         GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
         vBatt = readBattery()
         # pack the data into a defined format for tx via lora
-        databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, 0, 0, 0, 0, 0, vBatt, GPSdatetime)
+        databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, 0, 0, 0, 0, 0, vBatt, GPSdatetime,'*')
+        # calculate CRC
+        crc = calc_checksum(databytes)
+        # add the crc to the databytes
+        databytes = databytes + str(hex(crc))
         # send the data via LoRa
         s.send(databytes)
         # set msgSent flag to False
         msgSent = True
-
+    print(databytes)
     time.sleep(sendInterval) # wait sendInterval seconds

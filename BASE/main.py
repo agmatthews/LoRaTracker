@@ -12,6 +12,8 @@ import struct
 import gc
 import ujson
 import os
+from checksum import check_checksum
+from checksum import calc_checksum
 
 # configuration
 my_ID = 'BSE1' # unique id of this unit - 4 char string
@@ -19,10 +21,12 @@ receiveInterval = 2 # send data every 2 seconds
 ledInterval = 1000 # update LED every 1000usec
 WLAN_SSID = 'lerdy'
 WLAN_PWD = 'lerdy0519'
-dataStructure = '4sBffffffl' # structure for packing data into bytes to send
+dataStructure = '4sBffffffl1s' # structure packed data bytes received
 RockAirInterval = 2 * 60 * 1000  # Send data to TracPlus every (2 * 60 * 1000)usec = 2 minutes
 
 GPSFix = False
+lastFix = 0
+FixTimeout = 1000 * 30  # 30 seconds in ms
 GPSdatetime = None
 lat = None
 lon = None
@@ -31,6 +35,7 @@ speed = None
 course = None
 remote_ID = b''
 vBatt = 0.0
+CRC = b''
 msgReceived = False
 geoJSON = {}
 
@@ -91,7 +96,7 @@ def WWW_routes():
         response.WriteResponseJSONOk(geoJSON)
     return [('/gps.json', 'GET', _geojson)]
 
-print ('Starting A-BASE')
+print ('Starting BASE (LoRaTracker)')
 print ('   ID: ' + str(my_ID))
 
 print ("Starting Network")
@@ -147,25 +152,40 @@ mqtt.subscribe(topic="agmatthews/feeds/LORAtest")
 print ("Waiting for data")
 
 while True:
+    # if we havent had a fix recently then time out the most recent fix
+    if time.ticks_diff(lastFix, time.ticks_ms()) > FixTimeout:
+        GPSFix = False
+    # get some data from the LoRa buffer
     databytes = s.recv(256)
     stats = lora.stats()
-    if len(databytes)==36:
+    if len(databytes)>=40:
         GPSFix = False
         msgReceived = True
-        remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime = struct.unpack(dataStructure, databytes)
-        if GPSFix:
-            # print received data to serial port / screen
-            print(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
-            # make a geoJSON package of the recived data
-            geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {"remote_ID": str(remote_ID.decode()), "altitude": str(altitude), "speed": str(speed), "course": str(course), "battery": str(vBatt), "RSSI": str(stats.rssi), "datetime": str(GPSdatetime)}}
-            # write received data to log file in CSV format in append mode
-            #with open("/sd/log.csv", 'a') as Log_file:
-            #    Log_file.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + '\n')
-            # send data to MQTT server
-            #mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
-            uart1.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + str(GPSdatetime) + '\n')
+        if check_checksum(databytes):
+            # unpack the data into seperate variables
+            remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime, CRC = struct.unpack(dataStructure, databytes)
+            # if this has Good GPS data then process it
+            if GPSFix:
+                # record the time of this fix
+                lastFix = time.ticks_ms()
+                # print received data to serial port / screen
+                print('RX:' + str(remote_ID) + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+                # make a geoJSON package of the recived data
+                geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {"remote_ID": str(remote_ID.decode()), "altitude": str(altitude), "speed": str(speed), "course": str(course), "battery": str(vBatt), "RSSI": str(stats.rssi), "datetime": str(GPSdatetime)}}
+                # write received data to log file in CSV format in append mode
+                #with open("/sd/log.csv", 'a') as Log_file:
+                #    Log_file.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + '\n')
+                # send data to MQTT server
+                #mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+                uart1.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + str(GPSdatetime) + '\n')
+            else:
+                # print received data to serial port / screen
+                print(remote_ID + ",NOGPS," + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
         else:
-            # print received data to serial port / screen
-            print(remote_ID + ",NOGPS," + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+            print ("Checksum ERROR")
+            print ('Recv CRC: ')
+            print (databytes[:-4])
+            print ('Calc CRC: ')
+            print (hex(calc_checksum(databytes)))
 
     time.sleep(receiveInterval)
