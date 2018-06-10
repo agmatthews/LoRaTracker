@@ -25,8 +25,8 @@ dataStructure = '4sBffffffl1s' # structure packed data bytes received
 RockAirInterval = 2 * 60 * 1000  # Send data to TracPlus every (2 * 60 * 1000)usec = 2 minutes
 
 GPSFix = False
-lastFix = 0
 FixTimeout = 1000 * 30  # 30 seconds in ms
+lastFix = time.time() - FixTimeout
 GPSdatetime = None
 lat = None
 lon = None
@@ -67,7 +67,7 @@ def LED_thread():
         pycom.rgbled(0x000000)
         time.sleep_ms(int(ledInterval * 0.1))
 
-def RockAir_thread():
+def DataSend_thread():
 # periodically send data to TracPlus via RockAir via Serial Port
 # TESTING FTDI port /dev/cu.usbserial-A800JWP3
     global GPSFix
@@ -75,14 +75,19 @@ def RockAir_thread():
 
     while True:
         if GPSFix > 0:
-            # GPS OK so send A message
-            #
-            print ("GPS OK so send a message")
+            # GPS OK so send a message
+            print ("GPS FIX OK - so send a message")
+            # Free up memory by garbage collecting
+            gc.collect()
+            # send data out on serial port
+            uart1.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + str(GPSdatetime) + '\n')
+            # send data to MQTT server
+            mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
 
         else:
             # GPS BAD so don't send message
             #
-            print ("GPS BAD so don't send message")
+            print ("NO GPS FIX - so don't send message")
 
         time.sleep_ms(int(RockAirInterval))
 
@@ -117,8 +122,8 @@ pycom.heartbeat(False)
 pycom.rgbled(0x000011)
 _thread.start_new_thread(LED_thread, ())
 
-print ("Starting RockAir")
-_thread.start_new_thread(RockAir_thread, ())
+print ("Starting DataSend")
+_thread.start_new_thread(DataSend_thread, ())
 
 print ("Starting UART1")
 uart1 = UART(1, 115300, bits=8, parity=None, stop=1)
@@ -153,8 +158,10 @@ print ("Waiting for data")
 
 while True:
     # if we havent had a fix recently then time out the most recent fix
-    if time.ticks_diff(lastFix, time.ticks_ms()) > FixTimeout:
+    if time.time() - lastFix > FixTimeout:
         GPSFix = False
+    # Free up memory by garbage collecting
+    gc.collect()
     # get some data from the LoRa buffer
     databytes = s.recv(256)
     stats = lora.stats()
@@ -166,21 +173,18 @@ while True:
             remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime, CRC = struct.unpack(dataStructure, databytes)
             # if this has Good GPS data then process it
             if GPSFix:
-                # record the time of this fix
-                lastFix = time.ticks_ms()
+                # record the time of this fix in local seconds
+                lastFix = time.time()
                 # print received data to serial port / screen
-                print('RX:' + str(remote_ID) + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+                print(str(gc.mem_free()) +',RX:' + str(remote_ID) + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
                 # make a geoJSON package of the recived data
                 geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {"remote_ID": str(remote_ID.decode()), "altitude": str(altitude), "speed": str(speed), "course": str(course), "battery": str(vBatt), "RSSI": str(stats.rssi), "datetime": str(GPSdatetime)}}
                 # write received data to log file in CSV format in append mode
                 #with open("/sd/log.csv", 'a') as Log_file:
                 #    Log_file.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + '\n')
-                # send data to MQTT server
-                #mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
-                uart1.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + str(GPSdatetime) + '\n')
             else:
                 # print received data to serial port / screen
-                print(remote_ID + ",NOGPS," + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+                print(str(gc.mem_free()) +',RX:' + str(remote_ID) + ",NOGPS," + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
         else:
             print ("Checksum ERROR")
             print ('Recv CRC: ')
