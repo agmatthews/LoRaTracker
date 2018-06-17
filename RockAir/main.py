@@ -18,7 +18,7 @@ import uctypes
 from checksum import check_checksum
 from checksum import calc_checksum
 from crc16 import crc16xmodem
-from tracker import RockAir_getGPS
+from tracker import tracker
 
 # configuration
 my_ID = 'BSE1' # unique id of this unit - 4 char string
@@ -27,7 +27,7 @@ ledInterval = 1000 # update LED every 1000usec
 WLAN_SSID = 'lerdy'
 WLAN_PWD = 'lerdy0519'
 dataStructure = '4sBffffffll1s' # structure packed data bytes received
-RockAirInterval = 2 * 60 * 1000  # Send data to TracPlus every (2 * 60 * 1000)usec = 2 minutes
+dataSendInterval = 2 * 5 * 1000  # Send data to TracPlus every (2 * 60 * 1000)usec = 2 minutes
 WDtimeout = int(25 * 1000) # use watchdog timer to reset the board if it does not update reguarly (25 seconds)
 
 # istantiate libraries
@@ -79,10 +79,10 @@ def LED_thread():
         time.sleep_ms(int(ledInterval * 0.1))
 
 def DataSend_thread():
-# periodically send data to TracPlus via RockAir via Serial Port
-# TESTING FTDI port /dev/cu.usbserial-A800JWP3
+# periodically send data to MQTT server
+# periodically send data to TracPlus via RockAir
     global GPSFix
-    global RockAirInterval
+    global dataSendInterval
 
     while True:
         if GPSFix > 0:
@@ -91,16 +91,17 @@ def DataSend_thread():
             # Free up memory by garbage collecting
             gc.collect()
             # update location from tracker
-            RockAir_getGPS(uart1)
+            RockAir.getGPS()
+            print (RockAir._latitude[3],RockAir._longitude[3])
             # send data to MQTT server
-            mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+            mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3]))
 
         #else:
             # GPS BAD so don't send message
             #
             #print ("NO GPS FIX - so don't send message")
 
-        time.sleep_ms(int(RockAirInterval))
+        time.sleep_ms(int(dataSendInterval))
 
 def mqtt_callback(topic, msg):
     # this subroutine would process any message that comes back from MQTT server
@@ -136,10 +137,13 @@ _thread.start_new_thread(LED_thread, ())
 print ("Starting DataSend")
 _thread.start_new_thread(DataSend_thread, ())
 
-print ("Starting UART1")
+print ("Starting Serial Port")
 uart1 = UART(1, 19200, bits=8, parity=None, stop=1)
 uart1.init(baudrate=19200, bits=8, parity=None, stop=1)
-RockAir_getGPS(uart1)
+
+print ("Starting Tracker")
+RockAir = tracker(uart1, location_formatting='dd')
+RockAir.getGPS()
 
 print ("Starting SD Card")
 sd = SD()
