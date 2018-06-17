@@ -90,12 +90,8 @@ def DataSend_thread():
             print ("GPS FIX OK - so send a message")
             # Free up memory by garbage collecting
             gc.collect()
-            # send data out on serial port
-            print ("ask RockAir for location")
-            #uart1.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + str(GPSdatetime) + '\n')
-            uart1.write('R7+GPS\r')
-            print ("get location from RockAir")
-            print(uart1.readline())
+            # update location from tracker
+            RockAir_getGPS(uart1)
             # send data to MQTT server
             mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
 
