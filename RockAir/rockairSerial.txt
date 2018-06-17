@@ -27,8 +27,8 @@ response is
 <longitude>     dddmm.mmmmm
 <NS>            c N or S
 <course>        d degrees true or mag??
-<speed>         d kph??
-<altitude>      d feet??
+<speed>         d knots??
+<altitude>      ddd.d where ddd is the altitude in metres multiplied by 10
 <quality>       d ??
 <satellites>    dd count
 <hdop>          d.d metres??

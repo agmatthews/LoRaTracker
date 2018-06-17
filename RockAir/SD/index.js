@@ -21,7 +21,10 @@ realtime.on('update', function(e) {
                     'battery :' + p.battery+ 'V</BR>' +
                     'RSSI :' + p.RSSI+ '</BR>' +
                     'datetime :' + p.datetime+ '</BR>'  +
-                    'gpsTime :' + gpsTime.format('dddd, MMMM Do, YYYY h:mm:ss A');
+                    'gpsTime :' + gpsTime.format('dddd, MMMM Do, YYYY h:mm:ss A')+ '</BR>' +
+                    'RockAir_Lat :' + p.RockAir_Lat+ '</BR>'  +
+                    'RockAir_Lon :' + p.RockAir_Lon+ '</BR>'  +
+                    'RockAir_Time :' + p.RockAir_Time;
         },
         bindFeaturePopup = function(fId) {
             realtime.getLayer(fId).bindPopup(popupContent(fId));
