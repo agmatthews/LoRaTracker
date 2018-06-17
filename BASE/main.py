@@ -3,6 +3,7 @@ import machine
 from network import LoRa
 from network import WLAN
 from machine import SD
+from machine import WDT
 from microWebSrv import MicroWebSrv
 from mqtt import MQTTClient
 import socket
@@ -21,9 +22,14 @@ receiveInterval = 2 # send data every 2 seconds
 ledInterval = 1000 # update LED every 1000usec
 WLAN_SSID = 'lerdy'
 WLAN_PWD = 'lerdy0519'
-dataStructure = '4sBffffffl1s' # structure packed data bytes received
+dataStructure = '4sBffffffll1s' # structure packed data bytes received
 RockAirInterval = 2 * 60 * 1000  # Send data to TracPlus every (2 * 60 * 1000)usec = 2 minutes
+WDtimeout = int(25 * 1000) # use watchdog timer to reset the board if it does not update reguarly (25 seconds)
 
+# istantiate libraries
+wdt = WDT(timeout=WDtimeout) # enable a Watchdog timer with a specified timeou
+
+# initialise variables
 GPSFix = False
 FixTimeout = 1000 * 30  # 30 seconds in ms
 lastFix = time.time() - FixTimeout
@@ -38,6 +44,7 @@ vBatt = 0.0
 CRC = b''
 msgReceived = False
 geoJSON = {}
+remoteMem = 0
 
 def LED_thread():
 # continuously update the status of the unit via the onboard LED
@@ -84,10 +91,10 @@ def DataSend_thread():
             # send data to MQTT server
             mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
 
-        else:
+        #else:
             # GPS BAD so don't send message
             #
-            print ("NO GPS FIX - so don't send message")
+            #print ("NO GPS FIX - so don't send message")
 
         time.sleep_ms(int(RockAirInterval))
 
@@ -157,11 +164,13 @@ mqtt.subscribe(topic="agmatthews/feeds/LORAtest")
 print ("Waiting for data")
 
 while True:
+    # feed the watch dog timer
+    wdt.feed()
+    # Free up memory by garbage collecting
+    gc.collect()
     # if we havent had a fix recently then time out the most recent fix
     if time.time() - lastFix > FixTimeout:
         GPSFix = False
-    # Free up memory by garbage collecting
-    gc.collect()
     # get some data from the LoRa buffer
     databytes = s.recv(256)
     stats = lora.stats()
@@ -170,13 +179,13 @@ while True:
         msgReceived = True
         if check_checksum(databytes):
             # unpack the data into seperate variables
-            remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime, CRC = struct.unpack(dataStructure, databytes)
+            remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime, remoteMem, CRC = struct.unpack(dataStructure, databytes)
             # if this has Good GPS data then process it
             if GPSFix:
                 # record the time of this fix in local seconds
                 lastFix = time.time()
                 # print received data to serial port / screen
-                print(str(gc.mem_free()) +',RX:' + str(remote_ID) + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+                print(str(gc.mem_free()) + ',' + str(remoteMem) + ',RX:' + str(remote_ID) + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
                 # make a geoJSON package of the recived data
                 geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {"remote_ID": str(remote_ID.decode()), "altitude": str(altitude), "speed": str(speed), "course": str(course), "battery": str(vBatt), "RSSI": str(stats.rssi), "datetime": str(GPSdatetime)}}
                 # write received data to log file in CSV format in append mode
@@ -184,7 +193,7 @@ while True:
                 #    Log_file.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + '\n')
             else:
                 # print received data to serial port / screen
-                print(str(gc.mem_free()) +',RX:' + str(remote_ID) + ",NOGPS," + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
+                print(str(gc.mem_free()) + ',' + str(remoteMem) +',RX:' + str(remote_ID) + ",NOGPS," + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
         else:
             print ("Checksum ERROR")
             print ('Recv CRC: ')

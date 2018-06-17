@@ -13,6 +13,7 @@ import utime
 import _thread
 import struct
 import os
+import gc
 from checksum import check_checksum
 from checksum import calc_checksum
 
@@ -20,20 +21,24 @@ from checksum import calc_checksum
 my_ID = '$RM1' # unique id of this unit - 4 char string starting with $
 sendInterval = 5 # send data every 5 seconds
 ledInterval = 1000 # update LED every 1000usec
-dataStructure = '4sBffffffl1s' # structure for packing data into bytes to send to base unit with crc
-WDtimeout = int(sendInterval * 2.1 * 1000) # use watchdog timer to reset the board if it does not update reguarly
+dataStructure = '4sBffffffll1s' # structure for packing data into bytes to send to base unit with crc
+WDtimeout = int(sendInterval * 4.1 * 1000) # use watchdog timer to reset the board if it does not update reguarly
 staleGPStime = 10 # after 10 seconds consider the GPS stale
 
 # instantiate libraries
 pytrack = Pytrack()
 l76 = L76GNSS(pytrack)
 gps = MicropyGPS(location_formatting='dd') # return decimal degrees from GPS
-wdt = WDT(timeout=WDtimeout) # enable a Watchdog timer with a timeout of 2s
+wdt = WDT(timeout=WDtimeout) # enable a Watchdog timer with a specified timeou
 
 # instantiate variables
 msgSent = False
 time_since_fix = 0
 crc = 0
+altitude = 0
+speed = 0
+course = 0
+vbatt = 0
 
 def GPS_thread():
 # continuously reads data from I2C GPS and passes it to micropyGPS for decoding
@@ -111,17 +116,21 @@ lora = LoRa(mode=LoRa.LORA, region=LoRa.AU915)
 s = socket.socket(socket.AF_LORA, socket.SOCK_RAW)
 s.setblocking(False)
 
+print ("Waiting for GPS")
 # main loop
 while True:
+    # Free up memory by garbage collecting
+    gc.collect()
     # feed the watch dog timer
     wdt.feed()
+    # keep track of time since last fix
     time_since_fix = int(gps.time_since_fix())
     if (time_since_fix is None):
         time_since_fix = -1
     # check we have GPS data and process it if we do
     if gps.fix_stat > 0 and time_since_fix < staleGPStime and time_since_fix >= 0:
         # Got GPS data so send it to base via LoRa
-        print('OK Fix - Sending...')
+        #print('OK Fix - Sending...')
         # get coordinates
         lat = gps.latitude[0]
         lon = gps.longitude[0]
@@ -138,7 +147,7 @@ while True:
         # get date and time and make an POSIX EPOCH string from it
         GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
         # pack the data into a defined format for tx via lora without CRC
-        databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime,'*')
+        databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime,int(gc.mem_free()),'*')
         # calculate CRC
         crc = calc_checksum(databytes)
         # add the crc to the databytes
@@ -149,12 +158,12 @@ while True:
         msgSent = True
         # write received data to log file in CSV format in append mode
         with open("/sd/GPSlog.csv", 'a') as Log_file:
-            Log_file.write(my_ID + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
+            Log_file.write(my_ID + ',' + str(gc.mem_free()) + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
         # print current data to serial port for debug purposes
-        print('TX:' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
+        print(str(gc.mem_free()) +',TX:,' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
     else:
         # no GPS data so just send a ping packet
-        print('No Fix - Pinging...')
+        #print('No Fix - Pinging...')
         # get date and time and make an POSIX EPOCH string from it
         GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
         # read the battery volts
@@ -164,7 +173,7 @@ while True:
         if time_since_fix > staleGPStime or time_since_fix < 0:
             gpsStat = 0
         # pack the data into a defined format for tx via lora
-        databytes = struct.pack(dataStructure, my_ID, gpsStat, 0, 0, 0, 0, 0, vBatt, GPSdatetime,'*')
+        databytes = struct.pack(dataStructure, my_ID, gpsStat, 0, 0, 0, 0, 0, vBatt, GPSdatetime,int(gc.mem_free()),'*')
         # calculate CRC
         crc = calc_checksum(databytes)
         # add the crc to the databytes
@@ -173,4 +182,6 @@ while True:
         s.send(databytes)
         # set msgSent flag to False
         msgSent = True
+        # print current data for debug purposes
+        print(str(gc.mem_free()) +',TX:,0,0,' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
     time.sleep(sendInterval) # wait sendInterval seconds
