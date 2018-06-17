@@ -18,6 +18,7 @@ import uctypes
 from checksum import check_checksum
 from checksum import calc_checksum
 from crc16 import crc16xmodem
+from tracker import RockAir_getGPS
 
 # configuration
 my_ID = 'BSE1' # unique id of this unit - 4 char string
@@ -142,98 +143,7 @@ _thread.start_new_thread(DataSend_thread, ())
 print ("Starting UART1")
 uart1 = UART(1, 19200, bits=8, parity=None, stop=1)
 uart1.init(baudrate=19200, bits=8, parity=None, stop=1)
-# send data out on serial port
-print ("   query RockAir for location")
-uart1.write('R7+GPS\r')
-time.sleep(1)
-# get something back
-RockAirResponse = b''
-while uart1.any():
-    RockAirResponse = uart1.readline()
-    if len(RockAirResponse)>5:
-        break
-if len(RockAirResponse)>5:
-    #turn response into string
-    RockAirResponse = RockAirResponse.decode()
-    # strip off any carridge returns or new line characters
-    RockAirResponse = RockAirResponse.replace('\r', '')
-    RockAirResponse = RockAirResponse.replace('\n', '')
-    # split the response into segments at each comma
-    response_segments = str(RockAirResponse).split(',')
-    print (response_segments)
-
-    # Latitude
-    r_string = response_segments[1]
-    lat_degs = int(r_string[0:2])
-    lat_mins = float(r_string[2:-2])
-    lat_hemi = r_string[-1]
-    lat_dec = lat_degs + lat_mins / 60
-    if lat_hemi == 'S':
-        lat_dec = -1 * lat_dec
-
-    # Longitude
-    r_string = response_segments[0]
-    lon_degs = int(r_string[0:3])
-    lon_mins = float(r_string[3:-2])
-    lon_hemi = r_string[-1]
-    lon_dec = lon_degs + lon_mins / 60
-    if lon_hemi == 'W':
-        lon_dec = -1 * lon_dec
-
-    # course
-    r_string = response_segments[2]
-    course = float(r_string)
-
-    # speed
-    r_string = response_segments[3]
-    spd_knt = float(r_string)
-    spd_kph = spd_knt * 1.852
-    spd_mph = spd_knt * 1.151
-
-    # altitude
-    r_string = response_segments[4]
-    altitude = float(r_string)
-    # have to adjust altitude by factor of 10 because thats what the rockair does
-    altitude = altitude / 10.0
-
-    # quality ?? is this fix status?
-    r_string = response_segments[5]
-    quality = int(r_string)
-
-    # satellites
-    r_string = response_segments[6]
-    satellites = int(r_string)
-
-    # hdop
-    r_string = response_segments[7]
-    hdop = float(r_string)
-
-    # time
-    r_string = response_segments[8]
-    time_str = r_string.split(':')
-    time_hrs = int(time_str[0])
-    time_min = int(time_str[1])
-    time_sec = int(time_str[2])
-
-    # date
-    r_string = response_segments[9]
-    date_str = r_string.split('-')
-    date_dd = int(date_str[0])
-    date_mm = int(date_str[1])
-    date_yr = int(date_str[2])
-
-    print (lat_degs,lat_mins,lat_hemi,lat_dec)
-    print (lon_degs,lon_mins,lon_hemi,lon_dec)
-    print (time_hrs,time_min,time_sec,time_str)
-    print (date_dd,date_mm,date_yr,date_str)
-    print (spd_knt,spd_mph,spd_kph)
-    print (altitude)
-    print (course)
-    print (hdop)
-    print (satellites)
-    print (quality)
-else:
-    print ('No response')
+RockAir_getGPS(uart1)
 
 print ("Starting SD Card")
 sd = SD()
@@ -289,7 +199,7 @@ while True:
                 # print received data to serial port / screen
                 print(str(gc.mem_free()) + ',' + str(remoteMem) + ',RX:' + str(remote_ID) + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
                 # make a geoJSON package of the recived data
-                geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {"remote_ID": str(remote_ID.decode()), "altitude": str(altitude), "speed": str(speed), "course": str(course), "battery": str(vBatt), "RSSI": str(stats.rssi), "datetime": str(GPSdatetime), "RockAir_Lat": str(lat_dec), "RockAir_Lon": str(lon_dec), "RockAir_Time": time_str}}
+                geoJSON = {"geometry": {"type": "Point", "coordinates": [str(lon),str(lat)]}, "type": "Feature", "properties": {"remote_ID": str(remote_ID.decode()), "altitude": str(altitude), "speed": str(speed), "course": str(course), "battery": str(vBatt), "RSSI": str(stats.rssi), "datetime": str(GPSdatetime)}} #, "RockAir_Lat": str(lat_dec), "RockAir_Lon": str(lon_dec), "RockAir_Time": time_str}}
                 # write received data to log file in CSV format in append mode
                 with open("/sd/log.csv", 'a') as Log_file:
                     Log_file.write(remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(vBatt) + ',' + str(stats.rssi) + '\n')

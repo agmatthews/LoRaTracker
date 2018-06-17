@@ -1,5 +1,3 @@
-import uctypes
-
 def check_checksum( databytes ):
     """
     Check the checksum on a databytes object.
