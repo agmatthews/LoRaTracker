@@ -1,0 +1,56 @@
+RockAir Serial
+
+R7+GPS
+
+14425.40040E,3736.96060S,0,2,1487,3,12,7,02:51:10,17-06-18
+
+OK
+
+<latitude>,<EW>,<longitude>,<NS>,<course>,<speed>,<altitude>,<quality>,
+<satellites>,<hdop>,<time>,<date>\r
+
+
+
+
+
+
+documentation issues
+1) wiring / pinout colour
+
+2) R7+GPS gives different data to spec (missing commas)
+response is
+14425.40040E,3736.96060S,0,2,1487,3,12,7,02:51:10,17-06-18
+<latitude><EW>,<longitude><NS>,<course>,<speed>,<altitude>,<quality>,<satellites>,<hdop>,<time>,<date>\r
+
+<latitude>      dddmm.mmmmm
+<EW>            c E or W
+<longitude>     dddmm.mmmmm
+<NS>            c N or S
+<course>        d degrees true or mag??
+<speed>         d kph??
+<altitude>      d feet??
+<quality>       d ??
+<satellites>    dd count
+<hdop>          d.d metres??
+<time>          hh:mm:ss  UTC
+<date>          dd-mm-yy  UTC
+\r
+
+3) R7+TRACK:FREQ\r returns 16
+16 is lot listed in the spec
+
+
+4) url given in specs does not respond
+http://depa.usst.edu.cn/chenjq/www2/software/crc/CRC_Javascript/CRCcalculation.htm
+this one works
+http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
+select CRC_CCIT_ZERO
+
+hex conversion online
+http://www.convertstring.com/EncodeDecode/HexEncode
+crc calc
+http://crccalc.com/
+
+
+5) crc calculation example given is incorrect
+correct input text is 'Hello World' not 'Hello world'
