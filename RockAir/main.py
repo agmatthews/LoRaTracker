@@ -4,6 +4,7 @@ from network import LoRa
 from network import WLAN
 from machine import SD
 from machine import WDT
+from machine import UART
 from microWebSrv import MicroWebSrv
 from mqtt import MQTTClient
 import socket
@@ -15,9 +16,8 @@ import ujson
 import os
 import ubinascii
 import uctypes
-from checksum import check_checksum
-from checksum import calc_checksum
 from crc16 import crc16xmodem
+from crc16 import checkcrc
 from tracker import tracker
 
 # configuration
@@ -26,6 +26,8 @@ receiveInterval = 2 # send data every 2 seconds
 ledInterval = 1000 # update LED every 1000usec
 WLAN_SSID = 'lerdy'
 WLAN_PWD = 'lerdy0519'
+#WLAN_SSID = 'Galilean'
+#WLAN_PWD = 'ijemedoo'
 dataStructure = '4sBffffffll1s' # structure packed data bytes received
 dataSendInterval = 2 * 5 * 1000  # Send data to TracPlus every (2 * 60 * 1000)usec = 2 minutes
 WDtimeout = int(25 * 1000) # use watchdog timer to reset the board if it does not update reguarly (25 seconds)
@@ -91,8 +93,7 @@ def DataSend_thread():
             # Free up memory by garbage collecting
             gc.collect()
             # update location from tracker
-            RockAir.getGPS()
-            print (RockAir._latitude[3],RockAir._longitude[3])
+            #RockAir.getGPS()
             # send data to MQTT server
             mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=remote_ID + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(GPSdatetime) + ',' + str(stats.rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3]))
 
@@ -138,7 +139,7 @@ print ("Starting DataSend")
 _thread.start_new_thread(DataSend_thread, ())
 
 print ("Starting Serial Port")
-uart1 = UART(1, 19200, bits=8, parity=None, stop=1)
+uart1 = UART(1)#, 19200, bits=8, parity=None, stop=1)
 uart1.init(baudrate=19200, bits=8, parity=None, stop=1)
 
 print ("Starting Tracker")
@@ -156,7 +157,7 @@ print ("Starting Webserver")
 routes = WWW_routes()
 mws = MicroWebSrv(routeHandlers=routes, webPath="/sd") # TCP port 80 and files in /sd
 gc.collect()
-mws.Start()         # Starts server in a new thread
+mws.Start()
 gc.collect()
 
 print ("Starting Lora")
@@ -165,13 +166,12 @@ s = socket.socket(socket.AF_LORA, socket.SOCK_RAW)
 s.setblocking(False)
 
 print ('Starting MQTT')
+# need to make this fail gracefully if no internet available
+# use robust umqtt??
 mqtt = MQTTClient(my_ID, "io.adafruit.com",user="agmatthews", password="d9ee3d9d1d5a4f3b860d96beaa9d3413", port=1883)
 mqtt.set_callback(mqtt_callback)
 mqtt.connect()
 mqtt.subscribe(topic="agmatthews/feeds/LORAtest")
-
-print("testing CRC mod")
-print (str(hex(crc16xmodem(b'I am a Walrus'))))
 
 print ("Waiting for data")
 
@@ -189,9 +189,11 @@ while True:
     if len(databytes)>=40:
         GPSFix = False
         msgReceived = True
-        if check_checksum(databytes):
+#        print('My location',RockAir._latitude[3],RockAir._longitude[3])
+        if checkcrc(databytes):
+            print ("Message Received OK")
             # unpack the data into seperate variables
-            remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime, remoteMem, CRC = struct.unpack(dataStructure, databytes)
+            remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime, remoteMem, CRC = struct.unpack(dataStructure, databytes[6:])
             # if this has Good GPS data then process it
             if GPSFix:
                 # record the time of this fix in local seconds
@@ -207,10 +209,8 @@ while True:
                 # print received data to serial port / screen
                 print(str(gc.mem_free()) + ',' + str(remoteMem) +',RX:' + str(remote_ID) + ",NOGPS," + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
         else:
-            print ("Checksum ERROR")
-            print ('Recv CRC: ')
-            print (databytes[:-4])
-            print ('Calc CRC: ')
-            print (hex(calc_checksum(databytes)))
+            print ("Message Received ERROR - Checksum")
+            print (databytes)
+            print ('Recv CRC: ' + str(databytes[:6]) + 'Calc CRC: ' + str(hex(crc16xmodem(databytes[6:]))))
 
     time.sleep(receiveInterval)

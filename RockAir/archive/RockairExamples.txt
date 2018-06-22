@@ -16,3 +16,16 @@ get location from RockAir
 b'\n'
 b'\r14425.40220E,3736.96060S,0,1,1525,3,12,7,07:12:59,17-06-18\n'
 ['14425.40160E', '3736.96360S', '0', '2', '1515', '3', '12', '9', '07:29:30', '17-06-18']
+
+
+
+Todo:
+=====
+fix issue where second time use of getGPS does not works
+fix issue where internet is required or Mqtt fails etc
+allow multi wlan configuration
+allow fall back to switching to WLAN AP works when internet not available
+switch to crc16 for lora transmission
+put crc on start of message
+remove delimeters on message
+allow message to be json

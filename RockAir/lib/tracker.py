@@ -11,13 +11,6 @@ class tracker(object):
     Creates object that stores all relevant tracker data and statistics.
     #Parses sentences one line at a time using update().
     """
-
-    # Max Number of Characters a valid sentence can be (based on GGA sentence)
-    SENTENCE_LIMIT = 76
-    __HEMISPHERES = ('N', 'S', 'E', 'W')
-    __NO_FIX = 1
-    __FIX_2D = 2
-    __FIX_3D = 3
     __MONTHS = ('January', 'February', 'March', 'April', 'May',
                 'June', 'July', 'August', 'September', 'October',
                 'November', 'December')
@@ -65,8 +58,8 @@ class tracker(object):
         self.local_offset = local_offset
 
         # Position/Motion
-        self._latitude = (0, 0.0, 'N')
-        self._longitude = (0, 0.0, 'W')
+        self._latitude = (0, 0.0, 'N', 0.0)
+        self._longitude = (0, 0.0, 'W', 0.0)
         self.coord_format = location_formatting
         self.speed = (0.0, 0.0, 0.0)
         self.course = 0.0
@@ -127,7 +120,10 @@ class tracker(object):
         #
         #
         """
-        ## not working second time we come here - WHY?
+## not working second time we come here - WHY?
+# temp fix by deinit and re init the uart
+        self.uart.deinit()
+        self.uart.init(baudrate=19200, bits=8, parity=None, stop=1)
         # clear any unread chars from serial bus
         if self.uart.any():
             self.uart.readall()
@@ -138,11 +134,10 @@ class tracker(object):
         # get response from RockAir
         RockAirResponse = b''
         # while there is data on the serial port process it
-        print(self.uart.any())
         while self.uart.any():
             # read one line from serial port
             response = self.uart.readline()
-            print (response)
+            #print (response)
             # if this line is long enough to be the GPS response then processes it
             if len(response)>5:
                 #turn response into string
@@ -155,7 +150,7 @@ class tracker(object):
                 # split the response into segments at each comma
                 response_segments = str(response).split(',')
 
-                print(response)
+                #print(response)
                 print(response_segments)
 
                 try:
@@ -233,6 +228,7 @@ class tracker(object):
                     self.valid = True
 
                     # debug printing
+                    """
                     print (lat_degs,lat_mins,lat_hemi,lat_dec)
                     print (lon_degs,lon_mins,lon_hemi,lon_dec)
                     print (time_hrs,time_min,time_sec,time_str)
@@ -243,6 +239,7 @@ class tracker(object):
                     print (hdop)
                     print (sats_used)
                     print (quality)
+                    """
 
                     # once the response is processed the break the loop and return
                     break

@@ -1,3 +1,4 @@
+#
 import usocket as socket
 import ustruct as struct
 from ubinascii import hexlify
@@ -189,4 +190,3 @@ class MQTTClient:
     def check_msg(self):
         self.sock.setblocking(False)
         return self.wait_msg()
-

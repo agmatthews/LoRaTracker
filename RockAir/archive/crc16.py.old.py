@@ -88,16 +88,3 @@ def crc16xmodem(data, crc=0):
     Return calculated value of CRC
     """
     return _crc16(data, crc, CRC16_XMODEM_TABLE)
-
-def checkcrc(data):
-    """
-    Strip the 6 character crc of the data and compare it to a recalculated crc
-    `data`      - data for calculating CRC, must be bytes, must have crc on the front of data in form 0xNNNN
-    Return true if crc matches OK
-    """
-    crc = data[:6]
-    data = data[6:]
-    # convert int to hex to str to bytes to compare
-    if crc == str(hex(crc16xmodem(data))).encode():
-        return True
-    return False

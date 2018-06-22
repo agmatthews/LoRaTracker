@@ -14,8 +14,9 @@ import _thread
 import struct
 import os
 import gc
-from checksum import check_checksum
-from checksum import calc_checksum
+#from checksum import check_checksum
+#from checksum import calc_checksum
+from crc16 import crc16xmodem
 
 # configuration
 my_ID = '$RM1' # unique id of this unit - 4 char string starting with $
@@ -149,9 +150,12 @@ while True:
         # pack the data into a defined format for tx via lora without CRC
         databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime,int(gc.mem_free()),'*')
         # calculate CRC
-        crc = calc_checksum(databytes)
+        #crc = calc_checksum(databytes)
+        crc = str(hex(crc16xmodem(databytes)))
         # add the crc to the databytes
-        databytes = databytes + str(hex(crc))
+        #databytes = databytes + str(hex(crc))
+        #databytes = str(hex(crc)) + databytes
+        databytes = crc.encode() + databytes
         # send the data via LoRa
         s.send(databytes)
         # set msgSent flag to True
@@ -161,6 +165,8 @@ while True:
             Log_file.write(my_ID + ',' + str(gc.mem_free()) + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
         # print current data to serial port for debug purposes
         print(str(gc.mem_free()) +',TX:,' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
+        print(databytes)
+        print('------')
     else:
         # no GPS data so just send a ping packet
         #print('No Fix - Pinging...')
@@ -175,13 +181,17 @@ while True:
         # pack the data into a defined format for tx via lora
         databytes = struct.pack(dataStructure, my_ID, gpsStat, 0, 0, 0, 0, 0, vBatt, GPSdatetime,int(gc.mem_free()),'*')
         # calculate CRC
-        crc = calc_checksum(databytes)
+        #crc = calc_checksum(databytes)
+        crc = str(hex(crc16xmodem(databytes)))
         # add the crc to the databytes
-        databytes = databytes + str(hex(crc))
+        #databytes = databytes + str(hex(crc))
+        databytes = crc.encode() + databytes
         # send the data via LoRa
         s.send(databytes)
         # set msgSent flag to False
         msgSent = True
         # print current data for debug purposes
         print(str(gc.mem_free()) +',TX:,0,0,' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
+        print(databytes)
+        print('------')
     time.sleep(sendInterval) # wait sendInterval seconds
