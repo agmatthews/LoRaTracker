@@ -1,9 +1,9 @@
-#
 import pycom
 import machine
 import time
+import ubinascii
 from math import floor, modf
-
+from crc16 import crc16xmodem
 
 class tracker(object):
     """
@@ -132,7 +132,7 @@ class tracker(object):
         # wait for a second
         time.sleep(1)
         # get response from RockAir
-        RockAirResponse = b''
+        response = b''
         # while there is data on the serial port process it
         while self.uart.any():
             # read one line from serial port
@@ -244,6 +244,75 @@ class tracker(object):
                     # once the response is processed the break the loop and return
                     break
                 except ValueError:  # Bad Data
-                    print('tracker getgps fail')
+                    print('Tracker getgps fail')
                     return
         return
+
+    def sendMessage(self, message):
+        """
+        #
+        #
+        """
+        self.uart.deinit()
+        self.uart.init(baudrate=19200, bits=8, parity=None, stop=1)
+        # wait for a second
+        time.sleep(1)
+        # clear any unread chars from serial bus
+        if self.uart.any():
+            self.uart.readall()
+        # build up message to send from components
+        messageCMD = 'R7+WHP='
+        messageCRC = hex(crc16xmodem(message.encode()))[2:].upper()
+        messageHex = ubinascii.hexlify(message).decode().upper()
+        messageEnd = '\r'
+        messageData = messageCMD + messageCRC + messageHex + messageEnd
+        print('Sending : ' + message)
+        print(' Length : ' + str(len(messageData)))
+
+        # request RockAir send a message with position
+        self.uart.write(messageData)
+        # wait for a second
+        time.sleep(1)
+        # get response from RockAir
+        response = b''
+        responseTxt = ''
+        responseNum = 0
+
+        if self.uart.any():
+            # first line is just \n - read it and move on
+            response = self.uart.readline()
+
+        if self.uart.any():
+            # second line is message number - read it and store it
+            response = self.uart.readline()
+
+            #turn response into string
+            response = response.decode()
+
+            # strip off any carridge returns or new line characters
+            response = response.replace('\r', '')
+            response = response.replace('\n', '')
+
+            responseNum = int(response)
+
+        if self.uart.any():
+            # third line is RockAir response text - read it and store it
+            response = self.uart.readline()
+
+            #turn response into string
+            response = response.decode()
+
+            # strip off any carridge returns or new line characters
+            response = response.replace('\r', '')
+            response = response.replace('\n', '')
+
+            responseTxt = response
+
+        if self.uart.any():
+            # forth line is just \r - read it and move on
+            response = self.uart.readline()
+
+        print ('  Response: ' + responseTxt)
+        print ('  Message : ' + str(responseNum))
+
+        return responseNum

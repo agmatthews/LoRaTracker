@@ -14,9 +14,11 @@ import _thread
 import struct
 import os
 import gc
+import machine
 #from checksum import check_checksum
 #from checksum import calc_checksum
 from crc16 import crc16xmodem
+
 
 # configuration
 my_ID = '$RM1' # unique id of this unit - 4 char string starting with $
