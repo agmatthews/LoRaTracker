@@ -146,6 +146,7 @@ while True:
         altitude = gps.altitude
         speed = gps.speed[2] #km/h
         course = gps.course
+        # check if reading battery can interfere with GPS if occurs at same time as GPS data on I2C bus
         vBatt = readBattery()
         # get date and time and make an POSIX EPOCH string from it
         GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))

@@ -262,7 +262,9 @@ class tracker(object):
             self.uart.readall()
         # build up message to send from components
         messageCMD = 'R7+WHP='
-        messageCRC = hex(crc16xmodem(message.encode()))[2:].upper()
+        messageTYP = '0x00'
+    #check if messageTYP needs 'encoding'
+        messageCRC = hex(crc16xmodem(message.encode() + messageTYP.encode() ))[2:].upper()
         messageHex = ubinascii.hexlify(message).decode().upper()
         messageEnd = '\r'
         messageData = messageCMD + messageCRC + messageHex + messageEnd

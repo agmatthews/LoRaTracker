@@ -20,6 +20,9 @@ from crc16 import crc16xmodem
 from crc16 import checkcrc
 from tracker import tracker
 
+# create a debug print function instead of luts of print statements
+# log debug to SD card
+
 # configuration
 swVer = '0.1'
 hwVer = '0.1'
@@ -101,6 +104,7 @@ def DataSend_thread():
             # update currentlocation from tracker
             #RockAir.getGPS()
     # Need to find cause of error here
+    # fails on second getGPS() call
     # need to make getGPS more robust to errors
             print('Base location',RockAir._latitude[3],RockAir._longitude[3])
 
@@ -151,18 +155,26 @@ nets = wlan.scan()
 for net in nets:
     print('   Found SSID: '+ net.ssid)
     if net.ssid == WLAN_SSID:
+        # change to look for a set of SSID's
+        # allow a preference to be set - track this and connect but keep searching for high preference SSID
         print('   Connecting to: '+ net.ssid)
         wlan.connect(net.ssid, auth=(net.sec, WLAN_PWD), timeout=5000)
         while not wlan.isconnected():
             machine.idle() # save power while waiting
+        #this is blocking - put a time out on it - fail gracefully
         print("   Connected IP address:" + wlan.ifconfig()[0])
+        #set network_OK flag
+        #set internet_OK flag
         break
+    #else start local webserver
+    #set network_OK flag
 
 print ("Starting LED")
 pycom.heartbeat(False)
 pycom.rgbled(0x000011)
 _thread.start_new_thread(LED_thread, ())
 
+# move this down
 print ("Starting DataSend")
 _thread.start_new_thread(DataSend_thread, ())
 
@@ -192,7 +204,7 @@ os.mount(sd, '/sd')
 with open("/sd/log.csv", 'w') as Log_file:
     Log_file.write('remote_ID,GPSFix,latitude,longitude,voltage,rssi\n')
 
-if use_WebServer:
+if use_WebServer: # and if network_OK
     print ("Starting Webserver")
     routes = WWW_routes()
     mws = MicroWebSrv(routeHandlers=routes, webPath="/sd") # TCP port 80 and files in /sd
@@ -200,7 +212,7 @@ if use_WebServer:
     mws.Start()
     gc.collect()
 
-if use_MQTT:
+if use_MQTT: # and if internet_OK
     print ('Starting MQTT')
     # need to make this fail gracefully if no internet available
     # use robust umqtt??
