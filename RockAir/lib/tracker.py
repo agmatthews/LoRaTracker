@@ -263,11 +263,13 @@ class tracker(object):
         # build up message to send from components
         messageCMD = 'R7+WHP='
         messageTYP = '00'
-# leading zeros do not change crc calc no need to include them for message type 0x00
+        # leading zeros do not change crc calc no need to include them for message type 0x00
         messageCRC = hex(crc16xmodem(message.encode()))[2:].upper()
         messageHex = ubinascii.hexlify(message).decode().upper()
         messageEnd = '\r'
         messageData = messageCMD + messageCRC + messageTYP + messageHex + messageEnd
+
+        # debug printing
         """
         print (messageCMD)
         print (messageCRC)
@@ -299,7 +301,7 @@ class tracker(object):
             #turn response into string
             response = response.decode()
 
-            # strip off any carridge returns or new line characters
+            # strip off any carrige returns or new line characters
             response = response.replace('\r', '')
             response = response.replace('\n', '')
 
@@ -312,7 +314,7 @@ class tracker(object):
             #turn response into string
             response = response.decode()
 
-            # strip off any carridge returns or new line characters
+            # strip off any carrige returns or new line characters
             response = response.replace('\r', '')
             response = response.replace('\n', '')
 

@@ -16,9 +16,8 @@ import ujson
 import os
 import ubinascii
 import uctypes
-from crc16 import crc16xmodem
-from crc16 import checkcrc
-from tracker import tracker
+import crc16
+import tracker
 
 # create a debug print function instead of luts of print statements
 # log debug to SD card
@@ -29,10 +28,10 @@ hwVer = '0.1'
 my_ID = 'BSE1' # unique id of this unit - 4 char string
 receiveInterval = 2 # recive data every 2 seconds
 ledInterval = 1000 # update LED every 1000usec
-WLAN_SSID = 'lerdy'
-WLAN_PWD = 'lerdy0519'
-#WLAN_SSID = 'Galilean'
-#WLAN_PWD = 'ijemedoo'
+#WLAN_SSID = 'lerdy'
+#WLAN_PWD = 'lerdy0519'
+WLAN_SSID = 'Galilean'
+WLAN_PWD = 'ijemedoo'
 dataStructure = '4sBffffffll1s' # structure packed data bytes received
 dataSendInterval = 1 * 60 * 1000  # Send data to TracPlus every (2 * 60 * 1000)usec = 2 minutes
 WDtimeout = int(25 * 1000) # use watchdog timer to reset the board if it does not update reguarly (25 seconds)
@@ -60,6 +59,8 @@ deltaLat = 0
 deltaLon = 0
 use_MQTT = False
 use_WebServer = False
+msgCount = 0
+crcErrorCount = 0
 
 def LED_thread():
 # continuously update the status of the unit via the onboard LED
@@ -105,6 +106,7 @@ def DataSend_thread():
             #RockAir.getGPS()
     # Need to find cause of error here
     # fails on second getGPS() call
+    # is this because we may call this at the same time as a read is happening?
     # need to make getGPS more robust to errors
             print('Base location',RockAir._latitude[3],RockAir._longitude[3])
 
@@ -244,9 +246,9 @@ while True:
         print ("Message Received")
         GPSFix = False
         msgReceived = True
+        msgCount += 1
 #        print('My location',RockAir._latitude[3],RockAir._longitude[3])
-        if checkcrc(databytes):
-            #print ("CRC OK")
+        if crc16.checkcrc(databytes):
             # unpack the data into seperate variables
             remote_ID, GPSFix, lat, lon, altitude, speed, course, vBatt, GPSdatetime, remoteMem, eom = struct.unpack(dataStructure, databytes[6:])
             # if this has Good GPS data then process it
@@ -268,8 +270,10 @@ while True:
             # print received data to serial port / screen
             print(str(gc.mem_free()) + ',' + str(remoteMem) + ',RX:' + str(remote_ID) + ',' + str(GPSFix) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + ',' + str(stats.rssi))
         else:
-            print ("ERROR - Checksum")
-            #print (databytes)
-            print ('Recv CRC: ' + str(databytes[:6]) + 'Calc CRC: ' + str(hex(crc16xmodem(databytes[6:]))))
+            crcErrorCount += 1
+            print ('ERROR - Checksum.'
+            print ('  Count" + str(crcErrorCount) + ':' + str(msgCount))
+            print ('  Recv CRC: ' + str(databytes[:6]))
+            print ('  Calc CRC: ' + str(hex(crc16.xmodem(databytes[6:]))))
 
     time.sleep(receiveInterval)

@@ -106,8 +106,12 @@ class MicropyGPS(object):
     @property
     def latitude(self):
         """Format Latitude Data Correctly"""
+        lat_sign = 1
+        if (self._latitude[2] == 'S'):
+            lat_sign = -1
+
         if self.coord_format == 'dd':
-            decimal_degrees = self._latitude[0] + (self._latitude[1] / 60)
+            decimal_degrees = lat_sign * (self._latitude[0] + (self._latitude[1] / 60))
             return [decimal_degrees, self._latitude[2]]
         elif self.coord_format == 'dms':
             minute_parts = modf(self._latitude[1])
@@ -119,8 +123,11 @@ class MicropyGPS(object):
     @property
     def longitude(self):
         """Format Longitude Data Correctly"""
+        lon_sign = 1
+        if (self._latitude[2] == 'W'):
+            lon_sign = -1
         if self.coord_format == 'dd':
-            decimal_degrees = self._longitude[0] + (self._longitude[1] / 60)
+            decimal_degrees = lon_sign * (self._longitude[0] + (self._longitude[1] / 60))
             return [decimal_degrees, self._longitude[2]]
         elif self.coord_format == 'dms':
             minute_parts = modf(self._longitude[1])

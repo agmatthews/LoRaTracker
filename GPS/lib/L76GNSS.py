@@ -13,6 +13,10 @@ class L76GNSS:
         self.reg = bytearray(1)
         self.i2c.writeto(GPS_I2CADDR, self.reg)
 
+    def _readc(self):
+        self.reg = self.i2c.readfrom(GPS_I2CADDR, 1)
+        return self.reg
+
     def _read(self):
-        self.reg = self.i2c.readfrom(GPS_I2CADDR, 1) # was 64
+        self.reg = self.i2c.readfrom(GPS_I2CADDR, 64) # was 64
         return self.reg
