@@ -6,10 +6,7 @@ GPS
 
 motion activated power / sleep on GPS - include button interrupt - see fast rate etc
 Use smart beaconing to detect corners and send special messages etc
-send bread crumbs in messages
-set up web server on gps unit
-allow changing of parameters via web server
-allow viewing of status / map via web server
+--set up web server on gps unit
 
 change reporting rate depending on movement
 min_rate = 120 seconds
@@ -19,12 +16,16 @@ fast_rate = 1 second
 no movement for > x minutes = min_rate
 moved in last x minutes = norm_rate
 fast event trigger occured in last y seconds = fast_rate
-include manual button switch to normal (click) / fast (double click)
-GPS needs to start webserver and allow config setting and status display
-Set all parameters via web display and store them in flash/SD between boots
-put a switch on battery lead
 add taxi / takeoff / landing event detection
-find good rgb library and use it to better display LED as 'sleeping etc'
+include manual button switch to normal (click) / fast (double click)
+
+GPS needs to start webserver and allow config setting and status display
+allow changing of parameters via web server
+allow viewing of status / map via web server
+Set all parameters via web display and store them in flash/SD between boots
+
+put a switch on battery lead
+--find good rgb library and use it to better display LED as 'sleeping etc'
 check if reading battery can interfere with GPS if occurs at same time as GPS data on I2C bus
 
 
@@ -38,5 +39,6 @@ Webserver not serving SD card files on BASE
 getGPS fails on second call
 send more events to TracPlus
 define better compression / packing of data - msgpack or similar
+send bread crumbs in messages
 include breadcrumb in packing
 change way we import crc library to match GPS code

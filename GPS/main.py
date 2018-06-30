@@ -21,7 +21,7 @@ import machine
 import crc16
 
 # configuration
-my_ID = '$RM1' # unique id of this unit - 4 char string
+Unit_ID = '$RM1' # unique id of this unit - 4 char string
 dataStructure = '4sBffffffll1s' # structure for packing data into bytes to send to base unit with crc
 staleGPStime = 10 # after 10 seconds consider the GPS stale
 accThreshold = 2000 # acceleration threshold to in mG (ie 2000 = 2G)
@@ -30,7 +30,7 @@ slow_rate = 12 # slow reporting rate GPS to BASE
 norm_rate = 5 # normal reporting rate GPS to BASE
 fast_rate = 1 # fast reporting rate GPS to BASE
 WDtimeout = int(slow_rate * 2.1 * 1000) # use watchdog timer to reset the board if it does not update reguarly
-known_nets = { 'Galilean': {'pwd': 'ijemedoo'}, 'lerdyx': {'pwd': 'lerdy0519'} }
+known_nets = { 'Galilean': {'pwd': 'ijemedoo'}, 'lerdy': {'pwd': 'lerdy0519'} }
 TZ_offset_secs = 10*60*60  # AEST is +10 hours offset from UTC
 ntp_source = 'pool.ntp.org'
 webFilePath = '/sd'
@@ -40,6 +40,23 @@ batt_check_interval = 60 # check the vattery voltage every 60 Seconds
 use_WebServer = True
 network_OK = False
 lowBatt = 3.5
+
+# Flight velocity thresholds
+vTakeOffFW = 15 # FW RPAS must be airborne at 15 kph
+vLandingFW = 10 # assume FW RPAS is landed at 10 kph
+vTakeOffRW = 6 # RW RPASmust be flying at 5 kph
+vLandingRW = 4 # assume RW RPAS is entering hover at 4 kph
+
+# Flight States
+FS_UNKNOWN = 0
+FS_STATIONARY = 1
+FS_TAXI_HOVER = 2
+FS_FLIGHT = 3
+
+# set current State and thresholds
+currentState = FS_UNKNOWN
+vTakeOff = vTakeOffRW
+vLanding = vLandingRW
 
 # instantiate variables
 msgSent = False
@@ -139,14 +156,16 @@ def readBattery():
     return
 
 def WWW_routes():
-    global geoJSON
-    def _geojson(client, response):
-        response.WriteResponseJSONOk(geoJSON)
-    return [('/gps.json', 'GET', _geojson)]
+    global gps
+    global vBatt
+    def _statusjson(client, response):
+        statusJSON = {"geometry": {"type": "Point", "coordinates": [str(gps.longitude[0]),str(gps.latitude[0])]}, "type": "Feature", "properties": {"ID": str(Unit_ID), "altitude": str(gps.altitude), "speed": str(gps.speed[2]), "course": str(gps.course), "battery": str(vBatt)}}
+        response.WriteResponseJSONOk(statusJSON)
+    return [('/status.json', 'GET', _statusjson)]
 
 # Startup
 print ('Starting GPS (LoRaTracker)')
-print ('   ID: ' + str(my_ID))
+print ('   ID: ' + str(Unit_ID))
 
 print ("Starting Network")
 wlan = WLAN()
@@ -277,7 +296,7 @@ while True:
             # get date and time and make an POSIX EPOCH string from it
             GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
             # pack the data into a defined format for tx via lora without CRC
-            databytes = struct.pack(dataStructure, my_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime,int(gc.mem_free()),'*')
+            databytes = struct.pack(dataStructure, Unit_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime,int(gc.mem_free()),'*')
             # calculate CRC
             crc = str(hex(crc16.xmodem(databytes)))
             # add the crc to the databytes
@@ -288,7 +307,7 @@ while True:
             msgSent = True
             # write received data to log file in CSV format in append mode
             with open("/sd/GPSlog.csv", 'a') as Log_file:
-                Log_file.write(my_ID + ',' + str(gc.mem_free()) + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
+                Log_file.write(Unit_ID + ',' + str(gc.mem_free()) + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
             # print current data to serial port for debug purposes
             print(str(gc.mem_free()) +',TX:,' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
             #print(databytes)
@@ -303,7 +322,7 @@ while True:
             if time_since_fix > staleGPStime or time_since_fix < 0:
                 gpsStat = 0
             # pack the data into a defined format for tx via lora
-            databytes = struct.pack(dataStructure, my_ID, gpsStat, 0, 0, 0, 0, 0, vBatt, GPSdatetime,int(gc.mem_free()),'*')
+            databytes = struct.pack(dataStructure, Unit_ID, gpsStat, 0, 0, 0, 0, 0, vBatt, GPSdatetime,int(gc.mem_free()),'*')
             # calculate CRC
             #crc = calc_checksum(databytes)
             crc = str(hex(crc16.xmodem(databytes)))
@@ -321,4 +340,3 @@ while True:
         #print('Sleeping for ' + str(current_rate)+ ' seconds')
         #pytrack.setup_sleep(current_rate*1000)
         #pytrack.go_to_sleep()
-        #time.sleep(current_rate) # wait current_rate seconds
