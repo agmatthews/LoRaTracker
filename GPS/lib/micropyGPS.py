@@ -1,7 +1,7 @@
 """
 # MicropyGPS - a GPS NMEA sentence parser for Micropython/Python 3.X
 # Copyright (c) 2017 Michael Calvin McCoy (calvin.mccoy@gmail.com)
-# The MIT License (MIT) - see LICENSE file 
+# The MIT License (MIT) - see LICENSE file
 """
 
 # TODO:
@@ -793,7 +793,7 @@ class MicropyGPS(object):
             else:
                 month = str(self.date[1])
 
-            # Add leading zeros to year string if necessary
+            # Add leading zeros to year string if necessary 
             if self.date[2] < 10:
                 year = '0' + str(self.date[2])
             else:

@@ -1,3 +1,14 @@
+import socket
+import time
+import pycom
+import utime
+import _thread
+import struct
+import os
+import gc
+import machine
+import crc16
+import ujson
 from micropyGPS import MicropyGPS
 from network import LoRa
 from pytrack import Pytrack
@@ -9,16 +20,6 @@ from machine import SD
 from network import WLAN
 from microWebSrv import MicroWebSrv
 from rgb import RGBLED
-import socket
-import time
-import pycom
-import utime
-import _thread
-import struct
-import os
-import gc
-import machine
-import crc16
 
 # configuration
 Unit_ID = '$RM1' # unique id of this unit - 4 char string
@@ -296,7 +297,20 @@ while True:
             # get date and time and make an POSIX EPOCH string from it
             GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
             # pack the data into a defined format for tx via lora without CRC
-            databytes = struct.pack(dataStructure, Unit_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime,int(gc.mem_free()),'*')
+            #databytes = struct.pack(dataStructure, Unit_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime,int(gc.mem_free()),'*')
+#testing
+            theData = {}
+            theData["Unit_ID"] = Unit_ID
+            theData["GPSFix"] = gps.fix_stat
+            theData["lat"] = lat
+            theData["lon"] = lon
+            theData["altitude"] = altitude
+            theData["speed"] = speed
+            theData["course"] = course
+            theData["vBatt"] = vBatt
+            theData["GPSdatetime"] = GPSdatetime
+            theData["remoteMem"] = int(gc.mem_free())
+            databytes = ujson.dumps(theData).encode()
             # calculate CRC
             crc = str(hex(crc16.xmodem(databytes)))
             # add the crc to the databytes
@@ -309,7 +323,8 @@ while True:
             with open("/sd/GPSlog.csv", 'a') as Log_file:
                 Log_file.write(Unit_ID + ',' + str(gc.mem_free()) + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
             # print current data to serial port for debug purposes
-            print(str(gc.mem_free()) +',TX:,' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
+            print (theData)
+#            print(str(gc.mem_free()) +',TX:,' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
             #print(databytes)
             #print('------')
         else:
