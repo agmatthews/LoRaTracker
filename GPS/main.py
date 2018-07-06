@@ -300,16 +300,16 @@ while True:
             #databytes = struct.pack(dataStructure, Unit_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime,int(gc.mem_free()),'*')
 #testing
             theData = {}
-            theData["Unit_ID"] = Unit_ID
-            theData["GPSFix"] = gps.fix_stat
+            theData["uid"] = Unit_ID
+            theData["fix"] = gps.fix_stat
             theData["lat"] = lat
             theData["lon"] = lon
-            theData["altitude"] = altitude
-            theData["speed"] = speed
-            theData["course"] = course
-            theData["vBatt"] = vBatt
-            theData["GPSdatetime"] = GPSdatetime
-            theData["remoteMem"] = int(gc.mem_free())
+            theData["alt"] = altitude
+            theData["spd"] = speed
+            theData["crs"] = course
+            theData["bat"] = vBatt
+            theData["gdt"] = GPSdatetime
+            theData["mem"] = int(gc.mem_free())
             databytes = ujson.dumps(theData).encode()
             # calculate CRC
             crc = str(hex(crc16.xmodem(databytes)))
