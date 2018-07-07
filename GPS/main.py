@@ -23,7 +23,6 @@ from rgb import RGBLED
 
 # configuration
 Unit_ID = '$RM1' # unique id of this unit - 4 char string
-dataStructure = '4sBffffffll1s' # structure for packing data into bytes to send to base unit with crc
 staleGPStime = 10 # after 10 seconds consider the GPS stale
 accThreshold = 2000 # acceleration threshold to in mG (ie 2000 = 2G)
 accDuration = 200 # min acceleration duration in ms
@@ -137,7 +136,6 @@ def feed_GPS():
         gps.update(chr(c))
 
 def readBattery():
-# check if reading battery can interfere with GPS if occurs at same time as GPS data on I2C bus or because of teh sleeps etc
     global vBatt
     global last_batt_check
     global batt_check_interval
@@ -286,8 +284,6 @@ while True:
             if (rtc.now()[0] < 2018):
                 rtc.init((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0))
                 print('RTC Time updated from GPS:', rtc.now())
-            # keep track of time since last send
-            last_send_time = utime.time()
             # get coordinates and attributes
             lat = gps.latitude[0]
             lon = gps.longitude[0]
@@ -296,9 +292,7 @@ while True:
             course = gps.course
             # get date and time and make an POSIX EPOCH string from it
             GPSdatetime = utime.mktime((int(gps.date[2])+2000, int(gps.date[1]), int(gps.date[0]), int(gps.timestamp[0]), int(gps.timestamp[1]), int(gps.timestamp[2]), 0, 0, 0))
-            # pack the data into a defined format for tx via lora without CRC
-            #databytes = struct.pack(dataStructure, Unit_ID, gps.fix_stat, lat, lon, altitude, speed, course, vBatt, GPSdatetime,int(gc.mem_free()),'*')
-#testing
+            # pack the data into a dictionary object
             theData = {}
             theData["uid"] = Unit_ID
             theData["fix"] = gps.fix_stat
@@ -306,11 +300,12 @@ while True:
             theData["lon"] = lon
             theData["alt"] = altitude
             theData["spd"] = speed
-            theData["crs"] = course
+            theData["cog"] = course
             theData["bat"] = vBatt
             theData["gdt"] = GPSdatetime
             theData["mem"] = int(gc.mem_free())
-            databytes = ujson.dumps(theData).encode()
+            #convert the dictionionary object to JSON, remove any spaces, and encode it to bytes
+            databytes = ujson.dumps(theData).replace(" ", "").encode()
             # calculate CRC
             crc = str(hex(crc16.xmodem(databytes)))
             # add the crc to the databytes
@@ -319,14 +314,13 @@ while True:
             s.send(databytes)
             # set msgSent flag to True
             msgSent = True
+            # keep track of time since last send
+            last_send_time = utime.time()
             # write received data to log file in CSV format in append mode
             with open("/sd/GPSlog.csv", 'a') as Log_file:
                 Log_file.write(Unit_ID + ',' + str(gc.mem_free()) + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
             # print current data to serial port for debug purposes
             print (theData)
-#            print(str(gc.mem_free()) +',TX:,' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
-            #print(databytes)
-            #print('------')
         else:
             # no GPS data so just send a ping packet
             #print('No Fix - Pinging...')
@@ -336,21 +330,32 @@ while True:
             gpsStat = gps.fix_stat
             if time_since_fix > staleGPStime or time_since_fix < 0:
                 gpsStat = 0
-            # pack the data into a defined format for tx via lora
-            databytes = struct.pack(dataStructure, Unit_ID, gpsStat, 0, 0, 0, 0, 0, vBatt, GPSdatetime,int(gc.mem_free()),'*')
+            # pack the data into a dictionary object
+            theData = {}
+            theData["uid"] = Unit_ID
+            theData["fix"] = gps.fix_stat
+            theData["lat"] = 0
+            theData["lon"] = 0
+            theData["alt"] = 0
+            theData["spd"] = 0
+            theData["cog"] = 0
+            theData["bat"] = vBatt
+            theData["gdt"] = GPSdatetime
+            theData["mem"] = int(gc.mem_free())
+            #convert the dictionionary object to JSON, remove any spaces, and encode it to bytes
+            databytes = ujson.dumps(theData).replace(" ", "").encode()
             # calculate CRC
-            #crc = calc_checksum(databytes)
             crc = str(hex(crc16.xmodem(databytes)))
             # add the crc to the databytes
-            #databytes = databytes + str(hex(crc))
             databytes = crc.encode() + databytes
             # send the data via LoRa
             s.send(databytes)
             # set msgSent flag to False
             msgSent = True
+            # keep track of time since last send
+            last_send_time = utime.time()
             # print current data for debug purposes
-            print(str(gc.mem_free()) +',TX:,0,0,' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(gps.date) + ',' + str(vBatt) + ',' + str(gps.timestamp))
-            #print(databytes)
+            print (theData)
             #print('------')
         #print('Sleeping for ' + str(current_rate)+ ' seconds')
         #pytrack.setup_sleep(current_rate*1000)
