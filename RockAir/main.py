@@ -112,6 +112,7 @@ def update_LED():
 def sendMqttMsg():
 # periodically send data to MQTT server
     global GPSFix
+    global theData
     global mqttSendInterval
     global last_mqtt_send
 
@@ -122,14 +123,14 @@ def sendMqttMsg():
             print ("GPS OK - send MQTT message")
             # Free up memory by garbage collecting
             gc.collect()
-            # create message to send
             try:
+                # create message to send
                 theMsg = theData["uid"] + ',' + str(theData["fix"]) + ',' + str(theData["lat"]) + ',' + str(theData["lon"]) + ',' + str(theData["gdt"]) + ',' + str(stats.rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3])
+                # send data to MQTT server
+                mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=theMsg)
             except Exception as e:
                 print('   Data Error - No send via MQTT')
                 print(theData)
-            # send data to MQTT server
-            mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=theMsg)
         else:
             print('No FIX - No send via MQTT')
 
@@ -140,6 +141,7 @@ def mqtt_callback(topic, msg):
 def sendTrackerMsg():
 # periodically send data to TracPlus via RockAir
     global GPSFix
+    global theData
     global trackerSendInterval
     global last_msg_send
     global RockAir
