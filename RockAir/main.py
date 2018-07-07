@@ -270,9 +270,10 @@ print ("Starting SD Card")
 sd = SD()
 os.mount(sd, '/sd')
 # start new log file with headers
-with open(log_filename, 'w') as Log_file:
+with open(log_filename, 'a') as Log_file:
+    Log_file.write(str(rtc.now()))
     Log_file.write('remote_ID,GPSFix,latitude,longitude,voltage,rssi\n')
-Log_file.close()
+#Log_file.close()
 
 if use_WebServer and network_OK:
     print ("Starting Webserver")
@@ -348,6 +349,8 @@ while True:
                         deltaLat = 0
                         deltaLon = 0
                     # write received data to log file in CSV format in append mode
+                    with open(log_filename, 'a') as Log_file:
+                        Log_file.write(str(rtc.now()))
                     #with open(log_filename, 'a') as Log_file:
                     #    Log_file.write(theData["uid"] + ',' + str(theData["fix"]) + ',' + str(theData["lat"]) + ',' + str(theData["lon"]) + ',' + str(theData["bat"]) + ',' + str(stats.rssi) + '\n')
                     #Log_file.close()
