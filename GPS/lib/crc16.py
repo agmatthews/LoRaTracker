@@ -91,12 +91,15 @@ def xmodem(data, crc=0):
 
 def checkcrc(data):
     """
-    Strip the 4 character crc of the data and compare it to a recalculated crc
-    `data`      - data for calculating CRC, must be bytes, must have crc on the front of data
+    Strip the 6 character crc of the data and compare it to a recalculated crc
+    `data`      - data for calculating CRC, must be bytes, must have crc on the front of data in form 0xNNNN
     Return true if crc matches OK
     """
-    crc = data[:4]
-    data = data[4:]
-    if crc == xmodem(data):
+    crcTx = data[:6]
+    dataRx = data[6:]
+    # calculate crc for dataRx and convert to 0 padded hex string
+    crcRx = "0x{:04x}".format(xmodem(dataRx))
+    # compare Tx CRC and calculated CRC from Rx data
+    if crcTx == crcRx.encode():
         return True
     return False

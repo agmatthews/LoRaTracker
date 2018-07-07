@@ -306,11 +306,10 @@ while True:
             theData["mem"] = int(gc.mem_free())
             #convert the dictionionary object to JSON, remove any spaces, and encode it to bytes
             databytes = ujson.dumps(theData).replace(" ", "").encode()
-            # calculate CRC
-            crc = str(hex(crc16.xmodem(databytes)))
+            # calculate CRC and convert it to string with 0 padding to 4 chars
+            crc = "0x{:04x}".format(crc16.xmodem(databytes))
             # add the crc to the databytes
-            databytes = crc.encode() + databytes
-            # send the data via LoRa
+            databytes = crc.encode() + databytes            # send the data via LoRa
             s.send(databytes)
             # set msgSent flag to True
             msgSent = True
@@ -320,7 +319,7 @@ while True:
             with open("/sd/GPSlog.csv", 'a') as Log_file:
                 Log_file.write(Unit_ID + ',' + str(gc.mem_free()) + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
             # print current data to serial port for debug purposes
-            print (theData)
+            print (databytes)
         else:
             # no GPS data so just send a ping packet
             #print('No Fix - Pinging...')
