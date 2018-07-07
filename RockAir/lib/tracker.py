@@ -3,7 +3,12 @@ import machine
 import time
 import ubinascii
 from math import floor, modf
-from crc16 import crc16xmodem
+from machine import UART
+import crc16
+
+rockAirBaud = 19200 # baud rate for rock air tracker
+rockAirTx = 'P20' # this TX pin on the pycom connects to T1in on the max232 - blue
+rockAirRx = 'P21' # this RX pin on the pycom connects to R1out on the max232 - yellow
 
 class tracker(object):
     """
@@ -15,7 +20,7 @@ class tracker(object):
                 'June', 'July', 'August', 'September', 'October',
                 'November', 'December')
 
-    def __init__(self, uart, local_offset=0, location_formatting='ddm'):
+    def __init__(self, local_offset=0, location_formatting='ddm'):
         """
         Setup GPS Object Status Flags, Internal Data Registers, etc
             local_offset (int): Timzone Difference to UTC
@@ -27,6 +32,8 @@ class tracker(object):
 
         #####################
         # serial port
+#Testing
+        uart = UART(1, baudrate=rockAirBaud, bits=8, parity=None, stop=1, pins=(rockAirTx,rockAirRx))
         self.uart = uart
 
         #####################
@@ -84,6 +91,15 @@ class tracker(object):
     # Coordinates Translation Functions
     ########################################
     @property
+    def lat(self):
+        """return decimal_degrees latitude"""
+        return self._latitude[3]
+    @property
+    def lon(self):
+        """return decimal_degrees longitude"""
+        return self._longitude[3]
+
+    @property
     def latitude(self):
         """Format Latitude Data Correctly"""
         if self.coord_format == 'dd':
@@ -120,10 +136,7 @@ class tracker(object):
         #
         #
         """
-## not working second time we come here - WHY?
-# temp fix by deinit and re init the uart
-        self.uart.deinit()
-        self.uart.init(baudrate=19200, bits=8, parity=None, stop=1)
+        self.valid = False
         # clear any unread chars from serial bus
         if self.uart.any():
             self.uart.readall()
@@ -137,22 +150,15 @@ class tracker(object):
         while self.uart.any():
             # read one line from serial port
             response = self.uart.readline()
-            #print (response)
             # if this line is long enough to be the GPS response then processes it
             if len(response)>5:
                 #turn response into string
                 response = response.decode()
-
                 # strip off any carridge returns or new line characters
                 response = response.replace('\r', '')
                 response = response.replace('\n', '')
-
                 # split the response into segments at each comma
                 response_segments = str(response).split(',')
-
-                #print(response)
-                print(response_segments)
-
                 try:
                     # Latitude
                     r_string = response_segments[1]
@@ -162,7 +168,6 @@ class tracker(object):
                     lat_dec = lat_degs + lat_mins / 60
                     if lat_hemi == 'S':
                         lat_dec = -1 * lat_dec
-
                     # Longitude
                     r_string = response_segments[0]
                     lon_degs = int(r_string[0:3])
@@ -171,49 +176,40 @@ class tracker(object):
                     lon_dec = lon_degs + lon_mins / 60
                     if lon_hemi == 'W':
                         lon_dec = -1 * lon_dec
-
                     # course
                     r_string = response_segments[2]
                     course = float(r_string)
-
                     # speed
                     r_string = response_segments[3]
                     spd_knt = float(r_string)
                     spd_kph = spd_knt * 1.852
                     spd_mph = spd_knt * 1.151
-
                     # altitude
                     r_string = response_segments[4]
                     altitude = float(r_string)
                     # multiply altitude by factor of 10
                     altitude = altitude / 10.0
-
                     # quality ?? is this fix status?
                     r_string = response_segments[5]
                     quality = int(r_string)
-
                     # satellites
                     r_string = response_segments[6]
                     sats_used = int(r_string)
-
                     # hdop
                     r_string = response_segments[7]
                     hdop = float(r_string)
-
                     # time
                     r_string = response_segments[8]
                     time_str = r_string.split(':')
                     time_hrs = int(time_str[0])
                     time_min = int(time_str[1])
                     time_sec = int(time_str[2])
-
                     # date
                     r_string = response_segments[9]
                     date_str = r_string.split('-')
                     date_dd = int(date_str[0])
                     date_mm = int(date_str[1])
                     date_yr = int(date_str[2])
-
                     # Update Object Data
                     self._latitude = (lat_degs, lat_mins, lat_hemi, lat_dec)
                     self._longitude = (lon_degs, lon_mins, lon_hemi, lon_dec)
@@ -224,27 +220,15 @@ class tracker(object):
                     self.hdop = hdop
                     self.timestamp = (time_hrs, time_min, time_sec)
                     self.date = (date_dd, date_mm, date_yr)
-
                     self.valid = True
-
-                    # debug printing
-                    """
-                    print (lat_degs,lat_mins,lat_hemi,lat_dec)
-                    print (lon_degs,lon_mins,lon_hemi,lon_dec)
-                    print (time_hrs,time_min,time_sec,time_str)
-                    print (date_dd,date_mm,date_yr,date_str)
-                    print (spd_knt,spd_mph,spd_kph)
-                    print (altitude)
-                    print (course)
-                    print (hdop)
-                    print (sats_used)
-                    print (quality)
-                    """
-
-                    # once the response is processed the break the loop and return
+                    # once the response is processed clear the uart and break the loop to return
+                    if self.uart.any():
+                        self.uart.readall()
                     break
                 except ValueError:  # Bad Data
-                    print('Tracker getgps fail')
+                    self.valid = False
+                    print('Tracker getGPS ERROR')
+                    print(response_segments)
                     return
         return
 
@@ -253,10 +237,12 @@ class tracker(object):
         #
         #
         """
-        self.uart.deinit()
-        self.uart.init(baudrate=19200, bits=8, parity=None, stop=1)
+## not working second time we come here - WHY?
+# temp fix by deinit and re init the uart
+#        self.uart.deinit()
+#        self.uart.init(baudrate=19200, bits=8, parity=None, stop=1)
         # wait for a second
-        time.sleep(1)
+#        time.sleep(1)
         # clear any unread chars from serial bus
         if self.uart.any():
             self.uart.readall()
@@ -264,22 +250,13 @@ class tracker(object):
         messageCMD = 'R7+WHP='
         messageTYP = '00'
         # leading zeros do not change crc calc no need to include them for message type 0x00
-        messageCRC = hex(crc16xmodem(message.encode()))[2:].upper()
+        messageCRC = hex(crc16.xmodem(message.encode()))[2:].upper()
         messageHex = ubinascii.hexlify(message).decode().upper()
         messageEnd = '\r'
         messageData = messageCMD + messageCRC + messageTYP + messageHex + messageEnd
 
-        # debug printing
-        """
-        print (messageCMD)
-        print (messageCRC)
-        print (messageTYP)
-        print (messageHex)
-        print (messageEnd)
-        print (messageData)
-        """
-        print('Sending : ' + message)
-        print(' Length : ' + str(len(messageData)))
+        print('   Sending : ' + message)
+        print('   Length  : ' + str(len(messageData)))
 
         # request RockAir send a message with position
         self.uart.write(messageData)
@@ -293,10 +270,12 @@ class tracker(object):
         if self.uart.any():
             # first line is just \n - read it and move on
             response = self.uart.readline()
+            print('     response 1' + str(response))
 
         if self.uart.any():
             # second line is message number - read it and store it
             response = self.uart.readline()
+            print('     response 2' + str(response))
 
             #turn response into string
             response = response.decode()
@@ -305,11 +284,15 @@ class tracker(object):
             response = response.replace('\r', '')
             response = response.replace('\n', '')
 
-            responseNum = int(response)
+            try:
+                responseNum = int(response)
+            except (ValueError, TypeError):
+                responseNum = 0
 
         if self.uart.any():
             # third line is RockAir response text - read it and store it
             response = self.uart.readline()
+            print('     response 3' + str(response))
 
             #turn response into string
             response = response.decode()
@@ -323,8 +306,16 @@ class tracker(object):
         if self.uart.any():
             # forth line is just \r - read it and move on
             response = self.uart.readline()
+            print('     response 4' + str(response))
 
-        print ('  Response: ' + responseTxt)
-        print ('  Message : ' + str(responseNum))
+            # clear the UART of any remaiing data
+            if self.uart.any():
+                self.uart.readall()
+
+            print ('   Response: ' + responseTxt)
+            print ('   Message : ' + str(responseNum))
+
+        else:
+            print ('   Sending ERROR')
 
         return responseNum

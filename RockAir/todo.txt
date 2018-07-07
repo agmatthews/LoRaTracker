@@ -19,14 +19,15 @@ fast event trigger occured in last y seconds = fast_rate
 add taxi / takeoff / landing event detection
 include manual button switch to normal (click) / fast (double click)
 
-GPS needs to start webserver and allow config setting and status display
-allow changing of parameters via web server
+-- GPS needs to start webserver
+allow changing of config / parameters via web server
 allow viewing of status / map via web server
 Set all parameters via web display and store them in flash/SD between boots
 
-put a switch on battery lead
---find good rgb library and use it to better display LED as 'sleeping etc'
 check if reading battery can interfere with GPS if occurs at same time as GPS data on I2C bus
+
+--put a switch on battery lead
+--find good rgb library and use it to better display LED as 'sleeping etc'
 
 
 BASE
@@ -34,11 +35,29 @@ BASE
 record and send statistics / display on web page
 use logging module for debug printing... and Logging
 log files need to auto increment file name /number on start up
-Base needs to fail network connection gracefully and allow multiple networks to be defined - incl iphone
+--Base needs to fail network connection gracefully and allow multiple networks to be defined - incl iphone
 Webserver not serving SD card files on BASE
-getGPS fails on second call
+--getGPS fails on second call
 send more events to TracPlus
 define better compression / packing of data - msgpack or similar
 send bread crumbs in messages
 include breadcrumb in packing
-change way we import crc library to match GPS code
+--change way we import crc library to match GPS code
+
+
+
+OLDER
+=====
+Todo:
+=====
+fix issue where second time use of getGPS does not works
+fix issue where internet is required or Mqtt fails etc
+allow multi wlan configuration
+allow fall back to switching to WLAN AP works when internet not available
+switch to crc16 for lora transmission
+put crc on start of message
+remove delimeters on message
+allow message to be json
+# create a debug print function instead of luts of print statements
+# log debug to SD card
+# check if reading battery can interfere with GPS if occurs at same time as GPS data on I2C bus or because of teh sleeps etc
