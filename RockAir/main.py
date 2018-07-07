@@ -351,6 +351,14 @@ while True:
                     # write received data to log file in CSV format in append mode
                     with open(log_filename, 'a') as Log_file:
                         Log_file.write(str(rtc.now()))
+                        try:
+                            # create message to send
+                            theMsg = theData["uid"] + ',' + str(theData["fix"]) + ',' + str(theData["lat"]) + ',' + str(theData["lon"]) + ',' + str(theData["gdt"]) + ',' + str(stats.rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3])
+                            # write data to SD Card
+                            Log_file.write(theData["uid"] + ',' + str(theData["fix"]) + ',' + str(theData["lat"]) + ',' + str(theData["lon"]) + ',' + str(theData["bat"]) + ',' + str(stats.rssi) + '\n')
+                        except Exception as e:
+                            print('   Data Error - No SD card write')
+                            print(theData)
                     #with open(log_filename, 'a') as Log_file:
                     #    Log_file.write(theData["uid"] + ',' + str(theData["fix"]) + ',' + str(theData["lat"]) + ',' + str(theData["lon"]) + ',' + str(theData["bat"]) + ',' + str(stats.rssi) + '\n')
                     #Log_file.close()
