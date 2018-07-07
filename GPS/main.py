@@ -27,7 +27,7 @@ staleGPStime = 10 # after 10 seconds consider the GPS stale
 accThreshold = 2000 # acceleration threshold to in mG (ie 2000 = 2G)
 accDuration = 200 # min acceleration duration in ms
 slow_rate = 12 # slow reporting rate GPS to BASE
-norm_rate = 5 # normal reporting rate GPS to BASE
+norm_rate = 2 # normal reporting rate GPS to BASE
 fast_rate = 1 # fast reporting rate GPS to BASE
 WDtimeout = int(slow_rate * 2.1 * 1000) # use watchdog timer to reset the board if it does not update reguarly
 known_nets = { 'Galilean': {'pwd': 'ijemedoo'}, 'lerdy': {'pwd': 'lerdy0519'} }
@@ -218,6 +218,28 @@ print('   Local Time:', utime.localtime())
 print ("Starting SD Card")
 sd = SD()
 os.mount(sd, '/sd')
+maxIndex = 0
+# loop through all the files on the SD card
+for f in os.listdir('/sd'):
+    #look for GPSlognnnn files
+    if f[:6]=='GPSlog':
+        try:
+            # extract the number from the GPSlognnnn filename
+            index = int(f[6:].split(".")[0])
+        except ValueError:
+            index = 0
+        # if this is the highest numbered file then record it
+        if index > maxIndex:
+            maxIndex = index
+if maxIndex>9999:
+    print ('   SD card file name error - too many files')
+# create a new filename one number higher that the highest on theSD card
+log_filename = '/sd/GPSlog{:04d}.csv'.format(maxIndex+1)
+# write time and a header row to the new log file
+with open(log_filename, 'a') as Log_file:
+    Log_file.write(str(rtc.now()) + '\n')
+    Log_file.write('Unit_ID,Memory,GPSFix,latitude,longitude,altitude,speed,course,voltage,datetime\n')
+print('   Logfile: ' + log_filename)
 
 print ("Starting LED")
 led.h(led.ORANGE)
@@ -316,7 +338,7 @@ while True:
             # keep track of time since last send
             last_send_time = utime.time()
             # write received data to log file in CSV format in append mode
-            with open("/sd/GPSlog.csv", 'a') as Log_file:
+            with open(log_filename, 'a') as Log_file:
                 Log_file.write(Unit_ID + ',' + str(gc.mem_free()) + ',' + str(gps.fix_stat) + ',' + str(lat) + ',' + str(lon) + ',' + str(altitude) + ',' + str(speed) + ',' + str(course) + ',' + str(vBatt) + ',' + str(GPSdatetime) + '\n')
             # print current data to serial port for debug purposes
             print (databytes)

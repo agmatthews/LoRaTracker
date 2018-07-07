@@ -42,7 +42,7 @@ ntp_source = 'pool.ntp.org' # URL for network time protocol source
 napTime = 5 # number of milli seconds to nap to allow other things to happening
 FixTimeout = 1000 * 30  # 30 seconds in ms
 use_MQTT = True # if true and if internet available send data to MQTT server
-use_WebServer = False # if true and if network available fire up the local web server
+use_WebServer = True # if true and if network available fire up the local web server
 
 ##################################################
 ## Variables
@@ -269,11 +269,28 @@ else:
 print ("Starting SD Card")
 sd = SD()
 os.mount(sd, '/sd')
+maxIndex = 0
+# loop through all the files on the SD card
+for f in os.listdir('/sd'):
+    #look for GPSlognnnn files
+    if f[:6]=='GPSlog':
+        try:
+            # extract the number from the GPSlognnnn filename
+            index = int(f[6:].split(".")[0])
+        except ValueError:
+            index = 0
+        # if this is the highest numbered file then record it
+        if index > maxIndex:
+            maxIndex = index
+if maxIndex>9999:
+    print ('   SD card file name error - too many files')
+# create a new filename one number higher that the highest on theSD card
+log_filename = '/sd/GPSlog{:04d}.csv'.format(maxIndex+1)
+print('   Logfile: ' + log_filename)
 # start new log file with headers
 with open(log_filename, 'a') as Log_file:
-    Log_file.write(str(rtc.now()))
+    Log_file.write(str(rtc.now()) + '\n')
     Log_file.write('remote_ID,GPSFix,latitude,longitude,voltage,rssi\n')
-#Log_file.close()
 
 if use_WebServer and network_OK:
     print ("Starting Webserver")
