@@ -1,0 +1,28 @@
+{
+    'swVer': '0.2', # software version
+    'hwVer': '0.1', # hardware version
+    'my_ID': 'BASE', # unique id of this unit - 4 char string
+    'mqttSendInterval': 1 * 30 * 1000,  # Send data to TracPlus every (1* 30 * 1000)usec = 30 seconds
+    'trackerSendInterval': 5 * 60 * 1000,  # Send data to TracPlus every (5 * 60 * 1000)usec = 5 minutes
+    'WDtimeout': int(25 * 1000), # use watchdog timer to reset the board if it does not update reguarly (25 seconds)
+    'ledInterval': 1000, # update LED every 1000msec
+    'ledLightness': 5, # brightness value for indicator LED
+    'receiveInterval': 2, # recive data every 2 seconds
+    'staleGPStime': 10, # after 10 seconds consider the GPS stale
+    'TZ_offset_secs': 10 * 60 * 60,  # AEST is +10 hours offset from UTC
+    'ntp_source': 'pool.ntp.org', # URL for network time protocol source
+    'napTime': 5, # number of milli seconds to nap to allow other things to happening
+    'FixTimeout': 1000 * 30,  # 30 seconds in ms
+    'use_Tracker': True, # if true connect to the RockAir Tracker and get position and send data
+    'use_WebServer': True, # if true and if network available fire up the local web server
+    'use_MQTT': True, # if true and if internet available send data to MQTT server
+    'known_nets': { 'Galilean': {'pwd': 'ijemedoo'}, 'lerdy': {'pwd': 'lerdy0519'}, 'iPhone': {'pwd': 'Passw0rd'} }, # known WLAN networks to attempt connection to
+    'SSID': 'DroneTracker', # SSID to be used if no known nets can be found and local AP started
+    'LogFileBase': 'GPSlog', # file name for log file on SD card
+    'log_filename': '/sd/log.csv', # file name for log file on SD card
+    'MQTTserver': 'io.adafruit.com',
+    'MQTTuser': 'agmatthews',
+    'MQTTpass': 'd9ee3d9d1d5a4f3b860d96beaa9d3413',
+    'MQTTport': 1883,
+    'MQTTtopic': 'agmatthews/feeds/LORAtest'
+  }

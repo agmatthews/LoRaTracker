@@ -227,7 +227,12 @@ class tracker(object):
                     break
                 except ValueError:  # Bad Data
                     self.valid = False
-                    print('Tracker getGPS ERROR')
+                    print('Tracker getGPS value ERROR')
+                    print(response_segments)
+                    return
+                except IndexError:  # Bad Data
+                    self.valid = False
+                    print('Tracker getGPS index ERROR')
                     print(response_segments)
                     return
         return
@@ -270,12 +275,10 @@ class tracker(object):
         if self.uart.any():
             # first line is just \n - read it and move on
             response = self.uart.readline()
-            print('     response 1' + str(response))
 
         if self.uart.any():
             # second line is message number - read it and store it
             response = self.uart.readline()
-            print('     response 2' + str(response))
 
             #turn response into string
             response = response.decode()
@@ -292,7 +295,6 @@ class tracker(object):
         if self.uart.any():
             # third line is RockAir response text - read it and store it
             response = self.uart.readline()
-            print('     response 3' + str(response))
 
             #turn response into string
             response = response.decode()
@@ -306,7 +308,6 @@ class tracker(object):
         if self.uart.any():
             # forth line is just \r - read it and move on
             response = self.uart.readline()
-            print('     response 4' + str(response))
 
             # clear the UART of any remaiing data
             if self.uart.any():

@@ -20,46 +20,35 @@ import uctypes
 import crc16
 from tracker import tracker
 from rgb import RGBLED
+from geometry import gDistance, gBearing
 
 ##################################################
-## configuration
+## initial configuration
 ##################################################
-
-swVer = '0.2' # software version
-hwVer = '0.1' # hardware version
-my_ID = 'BSE1' # unique id of this unit - 4 char string
-known_nets = { 'Galilean': {'pwd': 'ijemedoo'}, 'lerdy': {'pwd': 'lerdy0519'} } # known WLAN networks to attempt connection to
-mqttSendInterval = 1 * 30 * 1000  # Send data to TracPlus every (1* 30 * 1000)usec = 30 seconds
-trackerSendInterval = 1 * 60 * 1000  # Send data to TracPlus every (2 * 60 * 1000)usec = 2 minutes
-WDtimeout = int(25 * 1000) # use watchdog timer to reset the board if it does not update reguarly (25 seconds)
-log_filename = "/sd/log.csv" # file name for log file on SD card
-ledInterval = 1000 # update LED every 1000msec
-ledLightness = 5 # brightness value for indicator LED
-receiveInterval = 2 # recive data every 2 seconds
-staleGPStime = 10 # after 10 seconds consider the GPS stale
-TZ_offset_secs = 10*60*60  # AEST is +10 hours offset from UTC
-ntp_source = 'pool.ntp.org' # URL for network time protocol source
-napTime = 5 # number of milli seconds to nap to allow other things to happening
-FixTimeout = 1000 * 30  # 30 seconds in ms
-use_MQTT = True # if true and if internet available send data to MQTT server
-use_WebServer = True # if true and if network available fire up the local web server
+config = {
+    'WDtimeout': int(25 * 1000), # use watchdog timer to reset the board if it does not update reguarly (25 seconds)
+    'FixTimeout': 1000 * 30,  # 30 seconds in ms
+    'receiveInterval': 2, # recive data every 2 seconds
+    'trackerSendInterval': 1 * 60 * 1000,  # Send data to TracPlus every (2 * 60 * 1000)usec = 2 minutes
+    'mqttSendInterval': 1 * 30 * 1000,  # Send data to TracPlus every (1* 30 * 1000)usec = 30 seconds
+    }
 
 ##################################################
 ## Variables
 ##################################################
 
 # instantiate libraries
-wdt = WDT(timeout=WDtimeout) # enable a Watchdog timer with a specified timeou
+wdt = WDT(timeout=config['WDtimeout']) # enable a Watchdog timer with a specified timeou
 led = RGBLED(10)  # start the status LED library
 rtc = machine.RTC() # start the real time clock library
 
 # initialise variables
-GPSFix = False
-lastFix = utime.time() - FixTimeout
-last_recv_time = utime.time() - receiveInterval
-last_msg_send = utime.time() - trackerSendInterval
-last_mqtt_send = utime.time() - mqttSendInterval
 msgReceived = False
+GPSFix = False
+lastFix = utime.time() - config['FixTimeout']
+last_recv_time = utime.time() - config['receiveInterval']
+last_msg_send = utime.time() - config['trackerSendInterval']
+last_mqtt_send = utime.time() - config['mqttSendInterval']
 geoJSON = {}
 deltaLat = 0
 deltaLon = 0
@@ -77,14 +66,14 @@ tracker_OK = False
 
 def update_LED():
 # continuously update the status of the unit via the onboard LED
+    global config
     global GPSFix
     global msgReceived
-    global ledInterval
     global last_LED_check
     global LED_count
     ledColour = 0x000000
 
-    if(utime.ticks_ms() - last_LED_check > ledInterval/100):
+    if(utime.ticks_ms() - last_LED_check > config['ledInterval']/100):
         last_LED_check = utime.ticks_ms()
         LED_count += 1
         if (LED_count<90):
@@ -94,7 +83,7 @@ def update_LED():
             else:
                 # GPS BAD so set LED to RED
                 ledHue= led.RED
-            if GPSFix and utime.time() - lastFix > staleGPStime:
+            if GPSFix and utime.time() - lastFix > config['staleGPStime']:
                 # No GPS fix for staleGPStime seconds so set LED to Orange
                 ledHue= led.ORANGE
             if msgReceived == True:
@@ -111,12 +100,12 @@ def update_LED():
 
 def sendMqttMsg():
 # periodically send data to MQTT server
+    global config
     global GPSFix
     global theData
-    global mqttSendInterval
     global last_mqtt_send
 
-    if(utime.ticks_ms() - last_mqtt_send > mqttSendInterval):
+    if(utime.ticks_ms() - last_mqtt_send > config['mqttSendInterval']):
         last_mqtt_send = utime.ticks_ms()
         if GPSFix > 0:
             # GPS OK so send a message
@@ -127,7 +116,7 @@ def sendMqttMsg():
                 # create message to send
                 theMsg = theData["uid"] + ',' + str(theData["fix"]) + ',' + str(theData["lat"]) + ',' + str(theData["lon"]) + ',' + str(theData["gdt"]) + ',' + str(stats.rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3])
                 # send data to MQTT server
-                mqtt.publish(topic="agmatthews/feeds/LORAtest", msg=theMsg)
+                mqtt.publish(topic=config['MQTTtopic'], msg=theMsg)
             except Exception as e:
                 print('   Data Error - No send via MQTT')
                 print(theData)
@@ -142,11 +131,11 @@ def sendTrackerMsg():
 # periodically send data to TracPlus via RockAir
     global GPSFix
     global theData
-    global trackerSendInterval
+    global config
     global last_msg_send
     global RockAir
 
-    if(utime.ticks_ms() - last_msg_send > trackerSendInterval):
+    if(utime.ticks_ms() - last_msg_send > config['trackerSendInterval']):
         last_msg_send = utime.ticks_ms()
         if GPSFix > 0:
             # GPS OK so send a message
@@ -159,7 +148,7 @@ def sendTrackerMsg():
                 # create a dictionary object to hold remote message data
                 try:
                     messageData = {}
-                    messageData["EVT"] = 'REMOTE'
+                    messageData["EVT"] = 'PROXD'
                     messageData["ID"] = theData["uid"]
                     messageData["LATD"] = deltaLat #lat delta
                     messageData["LOND"] = deltaLon #lon delta
@@ -180,10 +169,22 @@ def sendTrackerMsg():
             print('No FIX - No send via Tracker')
 
 def WWW_routes():
-    global geoJSON
+    global geoJSON, statusJSON,configJSON
     def _geojson(client, response):
         response.WriteResponseJSONOk(geoJSON)
-    return [('/gps.json', 'GET', _geojson)]
+    def _statusjson(client, response):
+        response.WriteResponseJSONOk(theData)
+    def _configjson(client, response):
+        response.WriteResponseJSONOk(config)
+    def _configure(client, response, arguments):
+        print ('Got config '+ str(arguments['item']) + ':' + str(arguments['value']))
+        if arguments['item'] in config:
+            config[arguments['item']] = arguments['value']
+            print ('Updated : ' + arguments['item'])
+            print ('Value   : ' + config[arguments['item']])
+        response.WriteResponseJSONOk(config)
+
+    return [('/gps.json', 'GET', _geojson),('/status.json', 'GET', _statusjson),('/config.json', 'GET', _configjson), ('/config/<item>/<value>', 'GET', _configure)]
 
 ##################################################
 ## MAIN loop
@@ -193,7 +194,43 @@ def WWW_routes():
 print (os.uname())
 
 print ('Starting BASE (LoRaTracker)')
-print ('   UnitID: ' + str(my_ID))
+
+print ("Starting SD Card")
+sd = SD()
+os.mount(sd, '/sd')
+# read config
+print ('   Reading config')
+with open('config.txt', 'r') as configFile:
+    configText = configFile.read()
+    config = eval(configText)
+# Start logfile
+print ('   Starting logfile')
+maxIndex = 0
+# loop through all the files on the SD card
+for f in os.listdir('/sd/logs'):
+    #look for 'LogFileBase'nnnn files
+    fnLen = len(config['LogFileBase'])
+    if f[:fnLen]==config['LogFileBase']:
+        try:
+            # extract the number from the GPSlognnnn filename
+            index = int(f[fnLen:].split(".")[0])
+        except ValueError:
+            index = 0
+        # if this is the highest numbered file then record it
+        if index > maxIndex:
+            maxIndex = index
+if maxIndex>9999:
+    print ('   SD card file name error - too many files')
+# create a new filename one number higher that the highest on theSD card
+log_filename = '/sd/logs/' + config['LogFileBase'] + '{:04d}.csv'.format(maxIndex+1)
+config['log_filename'] = log_filename
+print('   Logfile: ' + log_filename)
+# start new log file with headers
+with open(log_filename, 'a') as Log_file:
+    Log_file.write(str(rtc.now()) + '\n')
+    Log_file.write('remote_ID,GPSFix,latitude,longitude,voltage,rssi\n')
+
+print ('UnitID: ' + str(config['my_ID']))
 
 print ("Starting LED")
 led.h(led.BLUE)
@@ -207,12 +244,12 @@ for net in available_nets:
     print('   Found SSID: '+ net.ssid)
 nets = frozenset([e.ssid for e in available_nets])
 # match available nets with known nets
-known_nets_names = frozenset([key for key in known_nets])
+known_nets_names = frozenset([key for key in config['known_nets']])
 net_to_use = list(nets & known_nets_names)
 # try and use the first matching network
 try:
     net_to_use = net_to_use[0]
-    net_properties = known_nets[net_to_use]
+    net_properties = config['known_nets'][net_to_use]
     pwd = net_properties['pwd']
     sec = [e.sec for e in available_nets if e.ssid == net_to_use][0]
     print('   Connecting to: ' + net_to_use)
@@ -230,16 +267,16 @@ try:
 except Exception as e:
     print('   Cant connect to known networks')
     print('   Entering AP mode')
-    wlan.init(mode=WLAN.AP, ssid='GPSnode', channel=6, antenna=WLAN.INT_ANT)
+    wlan.init(mode=WLAN.AP, ssid=config['SSID'], channel=6, antenna=WLAN.INT_ANT)
     network_OK = True
 
 print('Starting Clocks')
 if network_OK:
-    print('   Syncing RTC to '+ ntp_source)
-    rtc.ntp_sync(ntp_source)
+    print('   Syncing RTC to '+ config['ntp_source'])
+    rtc.ntp_sync(config['ntp_source'])
     utime.sleep_ms(1500)
     print('   RTC Time :', rtc.now())
-utime.timezone(TZ_offset_secs)
+utime.timezone(config['TZ_offset_secs'])
 print('   Local Time:', utime.localtime())
 
 
@@ -255,9 +292,10 @@ if (RockAir.valid):
     # create a dictionary object to hold startup message data
     startupData = {}
     startupData["EVT"] = 'STARTUP'
-    startupData["ID"] = my_ID
-    startupData["SW"] = swVer
-    startupData["HW"] = hwVer
+    startupData["TYP"] = 'PROX_RX'
+    startupData["ID"] = config['my_ID']
+    startupData["SW"] = config['swVer']
+    startupData["HW"] = config['hwVer']
     # encode the message data as JSON without spaces
     encodedData = ujson.dumps(startupData).replace(" ", "")
     # send the startup message
@@ -266,33 +304,7 @@ else:
     print('   Tracker ERROR')
     tracker_OK = False
 
-print ("Starting SD Card")
-sd = SD()
-os.mount(sd, '/sd')
-maxIndex = 0
-# loop through all the files on the SD card
-for f in os.listdir('/sd'):
-    #look for GPSlognnnn files
-    if f[:6]=='GPSlog':
-        try:
-            # extract the number from the GPSlognnnn filename
-            index = int(f[6:].split(".")[0])
-        except ValueError:
-            index = 0
-        # if this is the highest numbered file then record it
-        if index > maxIndex:
-            maxIndex = index
-if maxIndex>9999:
-    print ('   SD card file name error - too many files')
-# create a new filename one number higher that the highest on theSD card
-log_filename = '/sd/GPSlog{:04d}.csv'.format(maxIndex+1)
-print('   Logfile: ' + log_filename)
-# start new log file with headers
-with open(log_filename, 'a') as Log_file:
-    Log_file.write(str(rtc.now()) + '\n')
-    Log_file.write('remote_ID,GPSFix,latitude,longitude,voltage,rssi\n')
-
-if use_WebServer and network_OK:
+if config['use_WebServer'] and network_OK:
     print ("Starting Webserver")
     routes = WWW_routes()
     mws = MicroWebSrv(routeHandlers=routes, webPath="/sd") # TCP port 80 and files in /sd
@@ -300,12 +312,13 @@ if use_WebServer and network_OK:
     mws.Start()
     gc.collect()
 
-if use_MQTT and internet_OK:
+if config['use_MQTT'] and internet_OK:
     print ('Starting MQTT')
-    mqtt = MQTTClient(my_ID, "io.adafruit.com",user="agmatthews", password="d9ee3d9d1d5a4f3b860d96beaa9d3413", port=1883)
+# put details in config
+    mqtt = MQTTClient(config['my_ID'], config['MQTTserver'],user=config['MQTTuser'], password=config['MQTTpass'], port=config['MQTTport'])
     mqtt.set_callback(mqtt_callback)
     mqtt.connect()
-    mqtt.subscribe(topic="agmatthews/feeds/LORAtest")
+    mqtt.subscribe(topic=config['MQTTtopic'])
 
 print ("Starting Lora")
 lora = LoRa(mode=LoRa.LORA, region=LoRa.AU915)
@@ -322,15 +335,16 @@ while True:
     # Free up memory by garbage collecting
     gc.collect()
     # periodically send message via Tracker
-    sendTrackerMsg()
+    if config['use_Tracker'] and tracker_OK:
+        sendTrackerMsg()
     # periodically send message via MQTT
-    if use_MQTT and internet_OK:
+    if config['use_MQTT'] and internet_OK:
         sendMqttMsg()
     # if we havent had a fix recently then time out the most recent fix
-    if utime.time() - lastFix > FixTimeout:
+    if utime.time() - lastFix > config['FixTimeout']:
         GPSFix = False
     # if it is time to check for a message then check for it
-    if(utime.time() > last_recv_time + receiveInterval):
+    if(utime.time() > last_recv_time + config['receiveInterval']):
         # get some data from the LoRa buffer
         databytes = s.recv(256)
         stats = lora.stats()
@@ -347,24 +361,76 @@ while True:
             if crc16.checkcrc(databytes):
                 # CRC is OK  - process message
                 theData = ujson.loads(databytes[6:].decode())
+                # print received data to debug
+                print(theData)
                 # check GPS data in the recived data
                 if theData["fix"] and theData["lon"]!=0:
                     # GPS is good - process message
                     GPSFix = True
                     # record the time of this fix in local seconds
                     lastFix = utime.time()
-                    # make a geoJSON package of the recived data
-                    geoJSON = {"geometry": {"type": "Point", "coordinates": [str(theData["lon"]),str(theData["lat"])]}, "type": "Feature", "properties": {"Unit_ID": theData["uid"], "altitude": str(theData["alt"]), "speed": str(theData["spd"]), "course": str(theData["cog"]), "battery": str(theData["bat"]), "RSSI": str(stats.rssi), "datetime": str(theData["gdt"])}} #, "RockAir_Lat": str(lat_dec), "RockAir_Lon": str(lon_dec), "RockAir_Time": time_str}}
                     # calculate delta between Base and remote node
                     RockAir.getGPS()
                     if (RockAir.valid):
-                        #print('   Tracker OK: ',RockAir._latitude[3],RockAir._longitude[3])
                         deltaLat = int((RockAir.lat - theData["lat"])*100000)
                         deltaLon = int((RockAir.lon - theData["lon"])*100000)
+                        theData["brg"] = gBearing(RockAir.lon, RockAir.lat, theData["lon"], theData["lat"])
+                        theData["dis"] = gDistance(RockAir.lon, RockAir.lat, theData["lon"], theData["lat"])*1000
+                        print('Remote:')
+                        print('   Bearing : ' + str(int(theData["brg"])))
+                        print('   Distance: ' + str(int(theData["dis"])))
                     else:
-                        print('Tracker ERROR')
+                        print('No valid Tracker ERROR')
                         deltaLat = 0
                         deltaLon = 0
+                    # make a geoJSON package of the recived data
+                    geoJSON = { "type": "FeatureCollection",
+                                "features":
+                                [
+                                    {
+                                        "type": "Feature",
+                                        "properties": {
+                                            "id": theData["uid"],
+                                            "type": 'drone',
+                                            "altitude": str(theData["alt"]),
+                                            "speed": str(theData["spd"]),
+                                            "course": str(theData["cog"]),
+                                            "battery": str(theData["bat"]),
+                                            "datetime": str(theData["gdt"])
+                                        },
+                                        "geometry": {
+                                            "type": "Point",
+                                            "coordinates": [theData["lon"],theData["lat"]]
+                                        }
+                                    },
+                                    {
+                                        "type": "Feature",
+                                        "properties": {
+                                            "id": config['my_ID'],
+                                            "type": 'base',
+                                            "RSSI": str(stats.rssi),
+                                            "RockAir_Lat": str(RockAir.lat),
+                                            "RockAir_Lon": str(RockAir.lon),
+                                            "datetime": str(RockAir.timestamp)
+                                        },
+                                        "geometry": {
+                                            "type": "Point",
+                                            "coordinates": [RockAir.lon,RockAir.lat]
+                                        }
+                                    },
+                                    {
+                                        "type": "Feature",
+                                        "properties": {
+                                            "id": "line",
+                                            "name": "linus"
+                                        },
+                                        "geometry": {
+                                            "type": "LineString",
+                                            "coordinates": [[RockAir.lon, RockAir.lat], [theData["lon"], theData["lat"]]]
+                                        }
+                                    }
+                                ]
+                            }
                     # write received data to log file in CSV format in append mode
                     with open(log_filename, 'a') as Log_file:
                         Log_file.write(str(rtc.now()))
@@ -376,13 +442,8 @@ while True:
                         except Exception as e:
                             print('   Data Error - No SD card write')
                             print(theData)
-                    #with open(log_filename, 'a') as Log_file:
-                    #    Log_file.write(theData["uid"] + ',' + str(theData["fix"]) + ',' + str(theData["lat"]) + ',' + str(theData["lon"]) + ',' + str(theData["bat"]) + ',' + str(stats.rssi) + '\n')
-                    #Log_file.close()
                 else:
                     print ("GPS BAD")
-                # print received data to serial port / screen
-                print(theData)
             else:
                 crcErrorCount += 1
                 print ('ERROR - Checksum.')
@@ -390,4 +451,4 @@ while True:
                 print ('  Recv CRC: ' + str(databytes[:6].decode()))
                 print ('  Calc CRC: ' + str(hex(crc16.xmodem(databytes[6:]))))
                 print ('  Rcv data: ' + str(databytes.decode()))
-    utime.sleep_ms(napTime)
+    utime.sleep_ms(config['napTime'])
