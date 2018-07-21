@@ -5,6 +5,7 @@ from network import WLAN
 from machine import SD
 from machine import WDT
 from machine import UART
+from machine import Pin
 from microWebSrv import MicroWebSrv
 from robust import MQTTClient
 import socket
@@ -44,7 +45,7 @@ config = {
 ##################################################
 
 # instantiate libraries
-wdt = WDT(timeout=config['WDtimeout']) # enable a Watchdog timer with a specified timeou
+#wdt = WDT(timeout=config['WDtimeout']) # enable a Watchdog timer with a specified timeou
 led = RGBLED(10)  # start the status LED library
 rtc = machine.RTC() # start the real time clock library
 #rdr = MFRC522("GP14", "GP16", "GP15", "GP22", "GP17")
@@ -87,7 +88,7 @@ def update_LED():
 
 def card_read():
 
-    rdr = MFRC522("GP14", "GP16", "GP15", "GP22", "GP17")
+    rdr = MFRC522(Pin.exp_board.G14, Pin.exp_board.G16, Pin.exp_board.G15, Pin.exp_board.G22, Pin.exp_board.G17)
 
     print("Present card to reader to read from address 0x08")
 
@@ -184,7 +185,7 @@ print ("Waiting for data")
 
 while True:
     # feed the watch dog timer
-    wdt.feed()
+#    wdt.feed()
     # update the status LED
     update_LED()
     # Free up memory by garbage collecting

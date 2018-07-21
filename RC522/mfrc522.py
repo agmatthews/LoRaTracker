@@ -17,8 +17,12 @@ class MFRC522:
 	def __init__(self, sck, mosi, miso, rst, cs):
 
 		print("init card reader")
-		print(sck)
-		
+		print("sck " + str(sck) )
+		print("mosi " + str(mosi) )
+		print("miso " + str(miso) )
+		print("rst " + str(rst) )
+		print("cs " + str(cs) )
+
 		self.sck = Pin(sck, mode=Pin.OUT)
 		self.mosi = Pin(mosi, mode=Pin.OUT)
 		self.miso = Pin(miso)
@@ -30,7 +34,7 @@ class MFRC522:
 
 		board = uname()[0]
 
-		if board == 'WiPy' or board == 'LoPy' or board == 'FiPy':
+		if board == 'WiPy' or board == 'LoPy' or board == 'LoPy4' or board == 'FiPy':
 			self.spi = SPI(0)
 			self.spi.init(SPI.MASTER, baudrate=1000000, pins=(self.sck, self.mosi, self.miso))
 		elif board == 'esp8266':
