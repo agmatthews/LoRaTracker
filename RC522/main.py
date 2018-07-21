@@ -37,7 +37,8 @@ config = {
     'ntp_source': 'pool.ntp.org', # URL for network time protocol source
     'ledInterval': 1000, # update LED every 1000msec
     'ledLightness': 5, # brightness value for indicator LED
-    'napTime': 5, # number of milli seconds to nap to allow other things to happening
+    'napTime': 2500, # number of milli seconds to nap to allow other things to happening
+    'cardInterval': 5000 # munber of milliseconds between card reads for same card
     }
 
 ##################################################
@@ -45,7 +46,7 @@ config = {
 ##################################################
 
 # instantiate libraries
-#wdt = WDT(timeout=config['WDtimeout']) # enable a Watchdog timer with a specified timeou
+wdt = WDT(timeout=config['WDtimeout']) # enable a Watchdog timer with a specified timeou
 led = RGBLED(10)  # start the status LED library
 rtc = machine.RTC() # start the real time clock library
 #rdr = MFRC522("GP14", "GP16", "GP15", "GP22", "GP17")
@@ -57,6 +58,10 @@ last_LED_check = 0
 LED_count = 0
 network_OK = False
 internet_OK = False
+blinkState = 0
+cardDetected = False
+lastCard = []
+lastCardTime = utime.ticks_ms() - config['cardInterval']
 
 ##################################################
 ## Functions
@@ -65,7 +70,8 @@ internet_OK = False
 def update_LED():
 # continuously update the status of the unit via the onboard LED
     global config
-    global tagRx
+    global cardDetected
+    global blinkState
     global last_LED_check
     global LED_count
     ledHue= led.BLUE
@@ -74,11 +80,17 @@ def update_LED():
         last_LED_check = utime.ticks_ms()
         LED_count += 1
         if (LED_count<90):
-            if tagRx == True:
+            if blinkState:
+                # GPS OK so set LED to Green
+                ledHue= led.GREEN
+            else:
+                # GPS BAD so set LED to RED
+                ledHue= led.RED
+            if cardDetected == True:
                 # Just sent a message so set the LED to Magenta
                 ledHue= led.MAGENTA
                 #reset the msg flag as we have actioned it
-                tagRx = False
+                cardDetected = False
             # set the LED colour with variable lightness based on LED_count
             led.hl(ledHue,LED_count)
         else:
@@ -87,40 +99,32 @@ def update_LED():
             LED_count = 0
 
 def card_read():
+    global cardDetected
+    global lastCard
 
     rdr = MFRC522(Pin.exp_board.G14, Pin.exp_board.G16, Pin.exp_board.G15, Pin.exp_board.G22, Pin.exp_board.G17)
 
-    print("Present card to reader to read from address 0x08")
-
-    try:
-        while True:
-
-            (stat, tag_type) = rdr.request(rdr.REQIDL)
-
+    while True:
+        (stat, tag_type) = rdr.request(rdr.REQIDL)
+        if stat == rdr.OK:
+            (stat, raw_uid) = rdr.anticoll()
             if stat == rdr.OK:
-
-				(stat, raw_uid) = rdr.anticoll()
-
-				if stat == rdr.OK:
-					print("New card detected")
-					print("  - tag type: 0x%02x" % tag_type)
-					print("  - uid	 : 0x%02x%02x%02x%02x" % (raw_uid[0], raw_uid[1], raw_uid[2], raw_uid[3]))
-					print("")
-
-					if rdr.select_tag(raw_uid) == rdr.OK:
-
-						key = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
-
-						if rdr.auth(rdr.AUTHENT1A, 8, key, raw_uid) == rdr.OK:
-							print("Address 8 data: %s" % rdr.read(8))
-							rdr.stop_crypto1()
-						else:
-							print("Authentication error")
-					else:
-						print("Failed to select tag")
-
-    except KeyboardInterrupt:
-        print("Bye")
+                if lastCard != raw_uid or utime.ticks_ms() - lastCardTime > config['cardInterval']:
+                    lastCardTime = utime.ticks_ms()
+                    lastCard = raw_uid
+                    cardDetected = True
+                    #print("New card detected")
+                    #print("  - tag type: 0x%02x" % tag_type)
+                    #print("  - uid	 : 0x%02x%02x%02x%02x" % (raw_uid[0], raw_uid[1], raw_uid[2], raw_uid[3]))
+                    if rdr.select_tag(raw_uid) == rdr.OK:
+                        key = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
+                        if rdr.auth(rdr.AUTHENT1A, 8, key, raw_uid) == rdr.OK:
+                            #print("Address 8 data: %s" % rdr.read(8))
+                            rdr.stop_crypto1()
+                        else:
+                            print("Authentication error")
+                    else:
+                        print("Failed to select tag")
 
 ##################################################
 ## MAIN loop
@@ -181,16 +185,20 @@ utime.timezone(config['TZ_offset_secs'])
 print('   Local Time:', utime.localtime())
 
 
-print ("Waiting for data")
+print ("Starting Card Reader")
+_thread.start_new_thread(card_read, ())
 
 while True:
     # feed the watch dog timer
-#    wdt.feed()
-    # update the status LED
-    update_LED()
+    wdt.feed()
     # Free up memory by garbage collecting
     gc.collect()
-    # read card
-    card_read()
+    #
+    if(cardDetected):
+        print (str(ubinascii.hexlify(bytearray(lastCard))))
+        cardDetected = False
+    # update the status LED
+    update_LED()
+    blinkState = not blinkState
     #
     utime.sleep_ms(config['napTime'])

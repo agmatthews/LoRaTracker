@@ -17,11 +17,11 @@ class MFRC522:
 	def __init__(self, sck, mosi, miso, rst, cs):
 
 		print("init card reader")
-		print("sck " + str(sck) )
-		print("mosi " + str(mosi) )
-		print("miso " + str(miso) )
-		print("rst " + str(rst) )
-		print("cs " + str(cs) )
+		print("   sck  " + str(sck) )
+		print("   mosi " + str(mosi) )
+		print("   miso " + str(miso) )
+		print("   rst  " + str(rst) )
+		print("   cs   " + str(cs) )
 
 		self.sck = Pin(sck, mode=Pin.OUT)
 		self.mosi = Pin(mosi, mode=Pin.OUT)
@@ -32,17 +32,9 @@ class MFRC522:
 		self.rst.value(0)
 		self.cs.value(1)
 
-		board = uname()[0]
-
-		if board == 'WiPy' or board == 'LoPy' or board == 'LoPy4' or board == 'FiPy':
-			self.spi = SPI(0)
-			self.spi.init(SPI.MASTER, baudrate=1000000, pins=(self.sck, self.mosi, self.miso))
-		elif board == 'esp8266':
-			self.spi = SPI(baudrate=100000, polarity=0, phase=0, sck=self.sck, mosi=self.mosi, miso=self.miso)
-			self.spi.init()
-		else:
-			raise RuntimeError("Unsupported platform")
-
+		self.spi = SPI(0)
+		self.spi.init(SPI.MASTER, baudrate=1000000, pins=(self.sck, self.mosi, self.miso))
+	
 		self.rst.value(1)
 		self.init()
 
