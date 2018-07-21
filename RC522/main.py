@@ -37,7 +37,7 @@ config = {
     'ntp_source': 'pool.ntp.org', # URL for network time protocol source
     'ledInterval': 1000, # update LED every 1000msec
     'ledLightness': 5, # brightness value for indicator LED
-    'napTime': 2500, # number of milli seconds to nap to allow other things to happening
+    'napTime': 50, # number of milli seconds to nap to allow other things to happening
     'cardInterval': 5000 # munber of milliseconds between card reads for same card
     }
 
@@ -199,6 +199,5 @@ while True:
         cardDetected = False
     # update the status LED
     update_LED()
-    blinkState = not blinkState
     #
     utime.sleep_ms(config['napTime'])

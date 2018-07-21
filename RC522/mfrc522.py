@@ -16,12 +16,14 @@ class MFRC522:
 
 	def __init__(self, sck, mosi, miso, rst, cs):
 
+		"""
 		print("init card reader")
 		print("   sck  " + str(sck) )
 		print("   mosi " + str(mosi) )
 		print("   miso " + str(miso) )
 		print("   rst  " + str(rst) )
 		print("   cs   " + str(cs) )
+		"""
 
 		self.sck = Pin(sck, mode=Pin.OUT)
 		self.mosi = Pin(mosi, mode=Pin.OUT)
@@ -34,7 +36,7 @@ class MFRC522:
 
 		self.spi = SPI(0)
 		self.spi.init(SPI.MASTER, baudrate=1000000, pins=(self.sck, self.mosi, self.miso))
-	
+
 		self.rst.value(1)
 		self.init()
 
