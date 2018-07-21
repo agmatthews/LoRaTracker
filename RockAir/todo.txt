@@ -42,6 +42,9 @@ crc check fails on 3 digit checksums
 {"spd":0,"lat":0,"fix":0,"alt":0,"uid":"$RM1","mem":2488784,"cog":0,"gdt":943976466,"lon":0,"bat":4.084552}
 Result CRC value: 0x559
 
+example Lora stats
+(rx_timestamp=35584291, rssi=-43, snr=6.0, sfrx=7, sftx=0, tx_trials=0, tx_power=20, tx_time_on_air=0, tx_counter=0, tx_frequency=0)
+
 DONE
 ====
 --GPS needs to start webserver
