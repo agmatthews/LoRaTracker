@@ -50,8 +50,10 @@ last_recv_time = utime.time() - config['receiveInterval']
 last_msg_send = utime.time() - config['trackerSendInterval']
 last_mqtt_send = utime.time() - config['mqttSendInterval']
 geoJSON = {}
-deltaLat = 0
-deltaLon = 0
+status = {}
+status["loraStats"] = {}
+status["deltaLat"] = 0
+status["deltaLon"] = 0
 msgCount = 0
 crcErrorCount = 0
 last_LED_check = 0
@@ -102,7 +104,7 @@ def sendMqttMsg():
 # periodically send data to MQTT server
     global config
     global GPSFix
-    global theData
+    global rxData
     global last_mqtt_send
 
     if(utime.ticks_ms() - last_mqtt_send > config['mqttSendInterval']):
@@ -114,12 +116,12 @@ def sendMqttMsg():
             gc.collect()
             try:
                 # create message to send
-                theMsg = theData["uid"] + ',' + str(theData["fix"]) + ',' + str(theData["lat"]) + ',' + str(theData["lon"]) + ',' + str(theData["gdt"]) + ',' + str(stats.rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3])
+                theMsg = rxData["uid"] + ',' + str(rxData["fix"]) + ',' + str(rxData["lat"]) + ',' + str(rxData["lon"]) + ',' + str(rxData["gdt"]) + ',' + str(status["loraStats"].rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3])
                 # send data to MQTT server
                 mqtt.publish(topic=config['MQTTtopic'], msg=theMsg)
             except Exception as e:
                 print('   Data Error - No send via MQTT')
-                print(theData)
+                print(rxData)
         else:
             print('No FIX - No send via MQTT')
 
@@ -130,7 +132,7 @@ def mqtt_callback(topic, msg):
 def sendTrackerMsg():
 # periodically send data to TracPlus via RockAir
     global GPSFix
-    global theData
+    global rxData
     global config
     global last_msg_send
     global RockAir
@@ -149,20 +151,20 @@ def sendTrackerMsg():
                 try:
                     messageData = {}
                     messageData["EVT"] = 'PROXD'
-                    messageData["ID"] = theData["uid"]
-                    messageData["LATD"] = deltaLat #lat delta
-                    messageData["LOND"] = deltaLon #lon delta
-                    messageData["SPD"] = "{:.0f}".format(theData["spd"])
-                    messageData["COG"] = "{:.0f}".format(theData["cog"])
-                    messageData["ALT"] = "{:.0f}".format(theData["alt"])
-                    messageData["BAT"] = "{:.2f}".format(theData["bat"])
+                    messageData["ID"] = rxData["uid"]
+                    messageData["LATD"] = status["deltaLat"] #lat delta
+                    messageData["LOND"] = status["deltaLon"] #lon delta
+                    messageData["SPD"] = "{:.0f}".format(rxData["spd"])
+                    messageData["COG"] = "{:.0f}".format(rxData["cog"])
+                    messageData["ALT"] = "{:.0f}".format(rxData["alt"])
+                    messageData["BAT"] = "{:.2f}".format(rxData["bat"])
                     # encode the message data as JSON without wasted spaces
                     encodedData = ujson.dumps(messageData).replace(" ", "")
                     # send the remote message
                     RockAir.sendMessage(encodedData)
                 except Exception as e:
                     print('   Data Error - No send via Tracker')
-                    print(theData)
+                    print(rxData)
             else:
                 print('   No valid Tracker')
         else:
@@ -173,7 +175,7 @@ def WWW_routes():
     def _geojson(client, response):
         response.WriteResponseJSONOk(geoJSON)
     def _statusjson(client, response):
-        response.WriteResponseJSONOk(theData)
+        response.WriteResponseJSONOk(rxData)
     def _configjson(client, response):
         response.WriteResponseJSONOk(config)
     def _configure(client, response, arguments):
@@ -347,24 +349,27 @@ while True:
     if(utime.time() > last_recv_time + config['receiveInterval']):
         # get some data from the LoRa buffer
         databytes = s.recv(256)
-        stats = lora.stats()
+        #stats = lora.stats()
+        status["loraStats"] = lora.stats()
         if len(databytes)>=40:
             print (' ')
             print ("Message Received")
             # record the time of this fix in local seconds
             last_recv_time = utime.time()
-            theData = {}
-            theData["fix"] = False
+            rxData = {}
+            rxData["fix"] = False
             msgReceived = True
             msgCount += 1
             # check the crc on the recived message
             if crc16.checkcrc(databytes):
                 # CRC is OK  - process message
-                theData = ujson.loads(databytes[6:].decode())
+                rxData = ujson.loads(databytes[6:].decode())
                 # print received data to debug
-                print(theData)
+                print(rxData)
+                status["rxData"] = rxData
+                #print(status["loraStats"].rssi)
                 # check GPS data in the recived data
-                if theData["fix"] and theData["lon"]!=0:
+                if rxData["fix"] and rxData["lon"]!=0:
                     # GPS is good - process message
                     GPSFix = True
                     # record the time of this fix in local seconds
@@ -372,17 +377,21 @@ while True:
                     # calculate delta between Base and remote node
                     RockAir.getGPS()
                     if (RockAir.valid):
-                        deltaLat = int((RockAir.lat - theData["lat"])*100000)
-                        deltaLon = int((RockAir.lon - theData["lon"])*100000)
-                        theData["brg"] = gBearing(RockAir.lon, RockAir.lat, theData["lon"], theData["lat"])
-                        theData["dis"] = gDistance(RockAir.lon, RockAir.lat, theData["lon"], theData["lat"])*1000
+                        status["RockAir"] = RockAir
+                        status["deltaLat"] = int((RockAir.lat - rxData["lat"])*100000)
+                        status["deltaLon"] = int((RockAir.lon - rxData["lon"])*100000)
+                        status["bearing"] = gBearing(RockAir.lon, RockAir.lat, rxData["lon"], rxData["lat"])
+                        status["distance"] = gDistance(RockAir.lon, RockAir.lat, rxData["lon"], rxData["lat"])*1000
                         print('Remote:')
-                        print('   Bearing : ' + str(int(theData["brg"])))
-                        print('   Distance: ' + str(int(theData["dis"])))
+                        print('   Bearing : ' + str(int(status["bearing"])))
+                        print('   Distance: ' + str(int(status["distance"])))
                     else:
                         print('No valid Tracker ERROR')
-                        deltaLat = 0
-                        deltaLon = 0
+                        status["deltaLat"] = 0
+                        status["deltaLon"] = 0
+                        status["bearing"] = 0
+                        status["distance"] = 0
+                    print(status)
                     # make a geoJSON package of the recived data
                     geoJSON = { "type": "FeatureCollection",
                                 "features":
@@ -390,17 +399,17 @@ while True:
                                     {
                                         "type": "Feature",
                                         "properties": {
-                                            "id": theData["uid"],
+                                            "id": rxData["uid"],
                                             "type": 'drone',
-                                            "altitude": str(theData["alt"]),
-                                            "speed": str(theData["spd"]),
-                                            "course": str(theData["cog"]),
-                                            "battery": str(theData["bat"]),
-                                            "datetime": str(theData["gdt"])
+                                            "altitude": str(rxData["alt"]),
+                                            "speed": str(rxData["spd"]),
+                                            "course": str(rxData["cog"]),
+                                            "battery": str(rxData["bat"]),
+                                            "datetime": str(rxData["gdt"])
                                         },
                                         "geometry": {
                                             "type": "Point",
-                                            "coordinates": [theData["lon"],theData["lat"]]
+                                            "coordinates": [rxData["lon"],rxData["lat"]]
                                         }
                                     },
                                     {
@@ -408,7 +417,7 @@ while True:
                                         "properties": {
                                             "id": config['my_ID'],
                                             "type": 'base',
-                                            "RSSI": str(stats.rssi),
+                                            "RSSI": str(status["loraStats"].rssi),
                                             "RockAir_Lat": str(RockAir.lat),
                                             "RockAir_Lon": str(RockAir.lon),
                                             "datetime": str(RockAir.timestamp)
@@ -426,7 +435,7 @@ while True:
                                         },
                                         "geometry": {
                                             "type": "LineString",
-                                            "coordinates": [[RockAir.lon, RockAir.lat], [theData["lon"], theData["lat"]]]
+                                            "coordinates": [[RockAir.lon, RockAir.lat], [rxData["lon"], rxData["lat"]]]
                                         }
                                     }
                                 ]
@@ -436,12 +445,12 @@ while True:
                         Log_file.write(str(rtc.now()))
                         try:
                             # create message to send
-                            theMsg = theData["uid"] + ',' + str(theData["fix"]) + ',' + str(theData["lat"]) + ',' + str(theData["lon"]) + ',' + str(theData["gdt"]) + ',' + str(stats.rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3])
+                            theMsg = rxData["uid"] + ',' + str(rxData["fix"]) + ',' + str(rxData["lat"]) + ',' + str(rxData["lon"]) + ',' + str(rxData["gdt"]) + ',' + str(status["loraStats"].rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3])
                             # write data to SD Card
-                            Log_file.write(theData["uid"] + ',' + str(theData["fix"]) + ',' + str(theData["lat"]) + ',' + str(theData["lon"]) + ',' + str(theData["bat"]) + ',' + str(stats.rssi) + '\n')
+                            Log_file.write(rxData["uid"] + ',' + str(rxData["fix"]) + ',' + str(rxData["lat"]) + ',' + str(rxData["lon"]) + ',' + str(rxData["bat"]) + ',' + str(status["loraStats"].rssi) + '\n')
                         except Exception as e:
                             print('   Data Error - No SD card write')
-                            print(theData)
+                            print(rxData)
                 else:
                     print ("GPS BAD")
             else:
