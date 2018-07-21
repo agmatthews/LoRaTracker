@@ -242,12 +242,6 @@ class tracker(object):
         #
         #
         """
-## not working second time we come here - WHY?
-# temp fix by deinit and re init the uart
-#        self.uart.deinit()
-#        self.uart.init(baudrate=19200, bits=8, parity=None, stop=1)
-        # wait for a second
-#        time.sleep(1)
         # clear any unread chars from serial bus
         if self.uart.any():
             self.uart.readall()

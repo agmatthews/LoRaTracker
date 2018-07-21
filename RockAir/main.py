@@ -175,7 +175,7 @@ def WWW_routes():
     def _geojson(client, response):
         response.WriteResponseJSONOk(geoJSON)
     def _statusjson(client, response):
-        response.WriteResponseJSONOk(rxData)
+        response.WriteResponseJSONOk(status)
     def _configjson(client, response):
         response.WriteResponseJSONOk(config)
     def _configure(client, response, arguments):
@@ -185,8 +185,25 @@ def WWW_routes():
             print ('Updated : ' + arguments['item'])
             print ('Value   : ' + config[arguments['item']])
         response.WriteResponseJSONOk(config)
+    def _sendtxt(client, response, arguments):
+        msgTxt = ""
+        if arguments['item'] == 'msg':
+            msgTxt = str(arguments['value'])
+            msgTxt = msgTxt.replace(" ", "_")
+            msgTxt = msgTxt.replace("%20", "_")
+            # Free up memory by garbage collecting
+            gc.collect()
+            try:
+                result = RockAir.sendMessage(msgTxt)
+                if result:
+                    response.WriteResponseJSONOk("{'result':'OK', 'msg':'" + msgTxt + "'}")
+                else:
+                    response.WriteResponseJSONOk("{'result':'ERROR'}")
+            except Exception as e:
+                print('   Data Error - No text via Tracker')
+                response.WriteResponseJSONOk("{'result':'ERROR'}")
 
-    return [('/gps.json', 'GET', _geojson),('/status.json', 'GET', _statusjson),('/config.json', 'GET', _configjson), ('/config/<item>/<value>', 'GET', _configure)]
+    return [('/gps.json', 'GET', _geojson),('/status.json', 'GET', _statusjson),('/config.json', 'GET', _configjson), ('/config/<item>/<value>', 'GET', _configure), ('/sendtxt/<item>/<value>', 'GET', _sendtxt)]
 
 ##################################################
 ## MAIN loop
@@ -349,8 +366,8 @@ while True:
     if(utime.time() > last_recv_time + config['receiveInterval']):
         # get some data from the LoRa buffer
         databytes = s.recv(256)
-        #stats = lora.stats()
         status["loraStats"] = lora.stats()
+        status["timeNow"] = rtc.now()
         if len(databytes)>=40:
             print (' ')
             print ("Message Received")
@@ -360,6 +377,7 @@ while True:
             rxData["fix"] = False
             msgReceived = True
             msgCount += 1
+            status["msgCount"] = msgCount
             # check the crc on the recived message
             if crc16.checkcrc(databytes):
                 # CRC is OK  - process message
@@ -377,21 +395,23 @@ while True:
                     # calculate delta between Base and remote node
                     RockAir.getGPS()
                     if (RockAir.valid):
-                        status["RockAir"] = RockAir
+                        status["RockAirValid"] = RockAir.valid
+                        status["RockAirLat"] = RockAir.lat
+                        status["RockAirLon"] = RockAir.lon
+                        status["RockAirTime"] = RockAir.timestamp
+# add more rockair items here eg speed alt etc
                         status["deltaLat"] = int((RockAir.lat - rxData["lat"])*100000)
                         status["deltaLon"] = int((RockAir.lon - rxData["lon"])*100000)
                         status["bearing"] = gBearing(RockAir.lon, RockAir.lat, rxData["lon"], rxData["lat"])
                         status["distance"] = gDistance(RockAir.lon, RockAir.lat, rxData["lon"], rxData["lat"])*1000
-                        print('Remote:')
-                        print('   Bearing : ' + str(int(status["bearing"])))
-                        print('   Distance: ' + str(int(status["distance"])))
+                        #print('Remote:   Bearing: ' + str(int(status["bearing"])) + ' Distance: ' + str(int(status["distance"])))
                     else:
                         print('No valid Tracker ERROR')
                         status["deltaLat"] = 0
                         status["deltaLon"] = 0
                         status["bearing"] = 0
                         status["distance"] = 0
-                    print(status)
+                    #print(status)
                     # make a geoJSON package of the recived data
                     geoJSON = { "type": "FeatureCollection",
                                 "features":
@@ -442,7 +462,7 @@ while True:
                             }
                     # write received data to log file in CSV format in append mode
                     with open(log_filename, 'a') as Log_file:
-                        Log_file.write(str(rtc.now()))
+                        Log_file.write(str(status["timeNow"]))
                         try:
                             # create message to send
                             theMsg = rxData["uid"] + ',' + str(rxData["fix"]) + ',' + str(rxData["lat"]) + ',' + str(rxData["lon"]) + ',' + str(rxData["gdt"]) + ',' + str(status["loraStats"].rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3])
@@ -455,6 +475,7 @@ while True:
                     print ("GPS BAD")
             else:
                 crcErrorCount += 1
+                status["crcErrorCount"] = crcErrorCount
                 print ('ERROR - Checksum.')
                 print ('  Messages: ' + str(msgCount) + ' recived, ' + str(crcErrorCount) + ' bad' )
                 print ('  Recv CRC: ' + str(databytes[:6].decode()))

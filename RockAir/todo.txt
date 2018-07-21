@@ -27,6 +27,8 @@ check if reading battery can interfere with GPS if occurs at same time as GPS da
 why do we get bad GPS data?
 detect it and eliminate it
 
+sleep GPS when not moving
+
 BASE
 ----
 record and send statistics / display on web page
@@ -37,6 +39,10 @@ define better compression / packing of data - msgpack or similar
 send bread crumbs in messages
 include breadcrumb in packing
 log debug to SD card
+use web sockets to send data to web page
+allow buttons on base unit to send events eg start up / shutdown
+test rfid rx to send message
+add more fields to base log file eg alt
 
 crc check fails on 3 digit checksums
 {"spd":0,"lat":0,"fix":0,"alt":0,"uid":"$RM1","mem":2488784,"cog":0,"gdt":943976466,"lon":0,"bat":4.084552}
@@ -64,3 +70,4 @@ DONE
 --set up web server on gps unit
 --Webserver not serving SD card files on BASE
 --log files need to auto increment file name /number on start up
+--store config in file and load it
