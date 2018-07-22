@@ -37,8 +37,8 @@ config = {
     'ntp_source': 'pool.ntp.org', # URL for network time protocol source
     'ledInterval': 1000, # update LED every 1000msec
     'ledLightness': 5, # brightness value for indicator LED
-    'napTime': 50, # number of milli seconds to nap to allow other things to happening
-    'cardInterval': 5000 # munber of milliseconds between card reads for same card
+    'napTime': 100, # number of milli seconds to nap to allow other things to happening
+    'cardInterval': 5000, # munber of milliseconds between card reads for same card
     }
 
 ##################################################
@@ -49,7 +49,6 @@ config = {
 wdt = WDT(timeout=config['WDtimeout']) # enable a Watchdog timer with a specified timeou
 led = RGBLED(10)  # start the status LED library
 rtc = machine.RTC() # start the real time clock library
-#rdr = MFRC522("GP14", "GP16", "GP15", "GP22", "GP17")
 
 # initialise variables
 status = {}
@@ -62,6 +61,10 @@ blinkState = 0
 cardDetected = False
 lastCard = []
 lastCardTime = utime.ticks_ms() - config['cardInterval']
+msgSent = False
+crc = 0
+last_send_time = 0
+knownCards = {}
 
 ##################################################
 ## Functions
@@ -74,23 +77,21 @@ def update_LED():
     global blinkState
     global last_LED_check
     global LED_count
+    global msgSent
     ledHue= led.BLUE
 
     if(utime.ticks_ms() - last_LED_check > config['ledInterval']/100):
         last_LED_check = utime.ticks_ms()
         LED_count += 1
         if (LED_count<90):
-            if blinkState:
-                # GPS OK so set LED to Green
-                ledHue= led.GREEN
-            else:
-                # GPS BAD so set LED to RED
-                ledHue= led.RED
+            ledHue= led.GREEN
             if cardDetected == True:
+                ledHue= led.RED
+            if msgSent == True:
                 # Just sent a message so set the LED to Magenta
                 ledHue= led.MAGENTA
                 #reset the msg flag as we have actioned it
-                cardDetected = False
+                msgSent = False
             # set the LED colour with variable lightness based on LED_count
             led.hl(ledHue,LED_count)
         else:
@@ -103,6 +104,7 @@ def card_read():
     global lastCard
 
     rdr = MFRC522(Pin.exp_board.G14, Pin.exp_board.G16, Pin.exp_board.G15, Pin.exp_board.G22, Pin.exp_board.G17)
+    print ('Started OK')
 
     while True:
         (stat, tag_type) = rdr.request(rdr.REQIDL)
@@ -184,20 +186,44 @@ if network_OK:
 utime.timezone(config['TZ_offset_secs'])
 print('   Local Time:', utime.localtime())
 
+print ("Starting LoRa")
+lora = LoRa(mode=LoRa.LORA, region=LoRa.AU915)
+s = socket.socket(socket.AF_LORA, socket.SOCK_RAW)
+s.setblocking(False)
 
 print ("Starting Card Reader")
 _thread.start_new_thread(card_read, ())
 
+# main loop
 while True:
-    # feed the watch dog timer
-    wdt.feed()
     # Free up memory by garbage collecting
     gc.collect()
-    #
-    if(cardDetected):
-        print (str(ubinascii.hexlify(bytearray(lastCard))))
-        cardDetected = False
+    # feed the watch dog timer
+    wdt.feed()
     # update the status LED
     update_LED()
-    #
+    # process any card data
+    if(cardDetected):
+        # pack the data into a dictionary object
+        theData = {}
+        theData["uid"] = str(config['my_ID'])
+        theData["typ"] = 'PRXC'
+        theData["crd"] = ubinascii.hexlify(bytearray(lastCard)).decode()
+        theData["rtc"] = utime.time()
+        theData["mem"] = int(gc.mem_free())
+        #convert the dictionionary object to JSON, remove any spaces, and encode it to bytes
+        databytes = ujson.dumps(theData).replace(" ", "").encode()
+        # calculate CRC and convert it to string with 0 padding to 4 chars
+        crc = "0x{:04x}".format(crc16.xmodem(databytes))
+        # add the crc to the databytes
+        databytes = crc.encode() + databytes            # send the data via LoRa
+        s.send(databytes)
+        # set msgSent flag to True
+        msgSent = True
+        # keep track of time since last send
+        last_send_time = utime.time()
+        # print current data to serial port for debug purposes
+        print (databytes)
+        cardDetected = False
+
     utime.sleep_ms(config['napTime'])

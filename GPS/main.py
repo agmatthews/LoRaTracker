@@ -27,7 +27,7 @@ staleGPStime = 10 # after 10 seconds consider the GPS stale
 accThreshold = 2000 # acceleration threshold to in mG (ie 2000 = 2G)
 accDuration = 200 # min acceleration duration in ms
 slow_rate = 12 # slow reporting rate GPS to BASE
-norm_rate = 2 # normal reporting rate GPS to BASE
+norm_rate = 10 # normal reporting rate GPS to BASE
 fast_rate = 1 # fast reporting rate GPS to BASE
 WDtimeout = int(slow_rate * 2.1 * 1000) # use watchdog timer to reset the board if it does not update reguarly
 known_nets = { 'Galilean': {'pwd': 'ijemedoo'}, 'lerdy': {'pwd': 'lerdy0519'} }
@@ -317,6 +317,7 @@ while True:
             # pack the data into a dictionary object
             theData = {}
             theData["uid"] = Unit_ID
+            theData["typ"] = 'GPS'
             theData["fix"] = gps.fix_stat
             theData["lat"] = lat
             theData["lon"] = lon
@@ -354,6 +355,7 @@ while True:
             # pack the data into a dictionary object
             theData = {}
             theData["uid"] = Unit_ID
+            theData["typ"] = 'GPS'
             theData["fix"] = gps.fix_stat
             theData["lat"] = 0
             theData["lon"] = 0

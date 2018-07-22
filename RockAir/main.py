@@ -387,92 +387,103 @@ while True:
                 status["rxData"] = rxData
                 #print(status["loraStats"].rssi)
                 # check GPS data in the recived data
-                if rxData["fix"] and rxData["lon"]!=0:
-                    # GPS is good - process message
-                    GPSFix = True
-                    # record the time of this fix in local seconds
-                    lastFix = utime.time()
-                    # calculate delta between Base and remote node
-                    RockAir.getGPS()
-                    if (RockAir.valid):
-                        status["RockAirValid"] = RockAir.valid
-                        status["RockAirLat"] = RockAir.lat
-                        status["RockAirLon"] = RockAir.lon
-                        status["RockAirTime"] = RockAir.timestamp
-# add more rockair items here eg speed alt etc
-                        status["deltaLat"] = int((RockAir.lat - rxData["lat"])*100000)
-                        status["deltaLon"] = int((RockAir.lon - rxData["lon"])*100000)
-                        status["bearing"] = gBearing(RockAir.lon, RockAir.lat, rxData["lon"], rxData["lat"])
-                        status["distance"] = gDistance(RockAir.lon, RockAir.lat, rxData["lon"], rxData["lat"])*1000
-                        #print('Remote:   Bearing: ' + str(int(status["bearing"])) + ' Distance: ' + str(int(status["distance"])))
+                if rxData["typ"] == 'GPS':
+                    if rxData["fix"] and rxData["lon"]!=0:
+                        # GPS is good - process message
+                        GPSFix = True
+                        # record the time of this fix in local seconds
+                        lastFix = utime.time()
+                        # calculate delta between Base and remote node
+                        RockAir.getGPS()
+                        if (RockAir.valid):
+                            status["RockAirValid"] = RockAir.valid
+                            status["RockAirLat"] = RockAir.lat
+                            status["RockAirLon"] = RockAir.lon
+                            status["RockAirTime"] = RockAir.timestamp
+    # add more rockair items here eg speed alt etc
+                            status["deltaLat"] = int((RockAir.lat - rxData["lat"])*100000)
+                            status["deltaLon"] = int((RockAir.lon - rxData["lon"])*100000)
+                            status["bearing"] = gBearing(RockAir.lon, RockAir.lat, rxData["lon"], rxData["lat"])
+                            status["distance"] = gDistance(RockAir.lon, RockAir.lat, rxData["lon"], rxData["lat"])*1000
+                            #print('Remote:   Bearing: ' + str(int(status["bearing"])) + ' Distance: ' + str(int(status["distance"])))
+                        else:
+                            print('No valid Tracker ERROR')
+                            status["deltaLat"] = 0
+                            status["deltaLon"] = 0
+                            status["bearing"] = 0
+                            status["distance"] = 0
+                        #print(status)
+                        # make a geoJSON package of the recived data
+                        geoJSON = { "type": "FeatureCollection",
+                                    "features":
+                                    [
+                                        {
+                                            "type": "Feature",
+                                            "properties": {
+                                                "id": rxData["uid"],
+                                                "type": 'drone',
+                                                "altitude": str(rxData["alt"]),
+                                                "speed": str(rxData["spd"]),
+                                                "course": str(rxData["cog"]),
+                                                "battery": str(rxData["bat"]),
+                                                "datetime": str(rxData["gdt"])
+                                            },
+                                            "geometry": {
+                                                "type": "Point",
+                                                "coordinates": [rxData["lon"],rxData["lat"]]
+                                            }
+                                        },
+                                        {
+                                            "type": "Feature",
+                                            "properties": {
+                                                "id": config['my_ID'],
+                                                "type": 'base',
+                                                "RSSI": str(status["loraStats"].rssi),
+                                                "RockAir_Lat": str(RockAir.lat),
+                                                "RockAir_Lon": str(RockAir.lon),
+                                                "datetime": str(RockAir.timestamp)
+                                            },
+                                            "geometry": {
+                                                "type": "Point",
+                                                "coordinates": [RockAir.lon,RockAir.lat]
+                                            }
+                                        },
+                                        {
+                                            "type": "Feature",
+                                            "properties": {
+                                                "id": "line",
+                                                "name": "linus"
+                                            },
+                                            "geometry": {
+                                                "type": "LineString",
+                                                "coordinates": [[RockAir.lon, RockAir.lat], [rxData["lon"], rxData["lat"]]]
+                                            }
+                                        }
+                                    ]
+                                }
+                        # write received data to log file in CSV format in append mode
+                        with open(log_filename, 'a') as Log_file:
+                            Log_file.write(str(status["timeNow"]))
+                            try:
+                                # create message to send
+                                theMsg = rxData["uid"] + ',' + str(rxData["fix"]) + ',' + str(rxData["lat"]) + ',' + str(rxData["lon"]) + ',' + str(rxData["gdt"]) + ',' + str(status["loraStats"].rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3])
+                                # write data to SD Card
+                                Log_file.write(rxData["uid"] + ',' + str(rxData["fix"]) + ',' + str(rxData["lat"]) + ',' + str(rxData["lon"]) + ',' + str(rxData["bat"]) + ',' + str(status["loraStats"].rssi) + '\n')
+                            except Exception as e:
+                                print('   Data Error - No SD card write')
+                                print(rxData)
                     else:
-                        print('No valid Tracker ERROR')
-                        status["deltaLat"] = 0
-                        status["deltaLon"] = 0
-                        status["bearing"] = 0
-                        status["distance"] = 0
-                    #print(status)
-                    # make a geoJSON package of the recived data
-                    geoJSON = { "type": "FeatureCollection",
-                                "features":
-                                [
-                                    {
-                                        "type": "Feature",
-                                        "properties": {
-                                            "id": rxData["uid"],
-                                            "type": 'drone',
-                                            "altitude": str(rxData["alt"]),
-                                            "speed": str(rxData["spd"]),
-                                            "course": str(rxData["cog"]),
-                                            "battery": str(rxData["bat"]),
-                                            "datetime": str(rxData["gdt"])
-                                        },
-                                        "geometry": {
-                                            "type": "Point",
-                                            "coordinates": [rxData["lon"],rxData["lat"]]
-                                        }
-                                    },
-                                    {
-                                        "type": "Feature",
-                                        "properties": {
-                                            "id": config['my_ID'],
-                                            "type": 'base',
-                                            "RSSI": str(status["loraStats"].rssi),
-                                            "RockAir_Lat": str(RockAir.lat),
-                                            "RockAir_Lon": str(RockAir.lon),
-                                            "datetime": str(RockAir.timestamp)
-                                        },
-                                        "geometry": {
-                                            "type": "Point",
-                                            "coordinates": [RockAir.lon,RockAir.lat]
-                                        }
-                                    },
-                                    {
-                                        "type": "Feature",
-                                        "properties": {
-                                            "id": "line",
-                                            "name": "linus"
-                                        },
-                                        "geometry": {
-                                            "type": "LineString",
-                                            "coordinates": [[RockAir.lon, RockAir.lat], [rxData["lon"], rxData["lat"]]]
-                                        }
-                                    }
-                                ]
-                            }
-                    # write received data to log file in CSV format in append mode
-                    with open(log_filename, 'a') as Log_file:
-                        Log_file.write(str(status["timeNow"]))
-                        try:
-                            # create message to send
-                            theMsg = rxData["uid"] + ',' + str(rxData["fix"]) + ',' + str(rxData["lat"]) + ',' + str(rxData["lon"]) + ',' + str(rxData["gdt"]) + ',' + str(status["loraStats"].rssi) + ',' + str(RockAir._latitude[3]) + ',' + str(RockAir._longitude[3])
-                            # write data to SD Card
-                            Log_file.write(rxData["uid"] + ',' + str(rxData["fix"]) + ',' + str(rxData["lat"]) + ',' + str(rxData["lon"]) + ',' + str(rxData["bat"]) + ',' + str(status["loraStats"].rssi) + '\n')
-                        except Exception as e:
-                            print('   Data Error - No SD card write')
-                            print(rxData)
-                else:
-                    print ("GPS BAD")
+                        print ("GPS BAD")
+                if rxData["typ"] == 'PRXC':
+                    # send message via RockAir
+                    messageData = {}
+                    messageData["EVT"] = 'PROXC'
+                    messageData["ID"] = rxData["uid"]
+                    messageData["CARD"] = rxData["crd"]
+                    # encode the message data as JSON without wasted spaces
+                    encodedData = ujson.dumps(messageData).replace(" ", "")
+                    # send the remote message
+                    RockAir.sendMessage(encodedData)
             else:
                 crcErrorCount += 1
                 status["crcErrorCount"] = crcErrorCount

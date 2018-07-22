@@ -3,7 +3,7 @@
     'hwVer': '0.1', # hardware version
     'my_ID': 'BASE', # unique id of this unit - 4 char string
     'mqttSendInterval': 1 * 30 * 1000,  # Send data to TracPlus every (1* 30 * 1000)usec = 30 seconds
-    'trackerSendInterval': 5 * 60 * 1000,  # Send data to TracPlus every (5 * 60 * 1000)usec = 5 minutes
+    'trackerSendInterval': 1 * 60 * 1000,  # Send data to TracPlus every (5 * 60 * 1000)usec = 5 minutes
     'WDtimeout': int(25 * 1000), # use watchdog timer to reset the board if it does not update reguarly (25 seconds)
     'ledInterval': 1000, # update LED every 1000msec
     'ledLightness': 5, # brightness value for indicator LED
