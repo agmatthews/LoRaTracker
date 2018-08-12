@@ -16,7 +16,7 @@
     'use_Tracker': True, # if true connect to the RockAir Tracker and get position and send data
     'use_WebServer': True, # if true and if network available fire up the local web server
     'use_MQTT': True, # if true and if internet available send data to MQTT server
-    'known_nets': { 'Galilean': {'pwd': 'ijemedoo'}, 'lerdy': {'pwd': 'lerdy0519'}, 'iPhone': {'pwd': 'Passw0rd'} }, # known WLAN networks to attempt connection to
+    'known_nets': { 'Galilean': {'pwd': 'ijemedoo'}, 'lerdy': {'pwd': 'lerdy0519'}, 'iPhone': {'pwd': 'Passw0rd'} , 'tickerg': {'pwd': 'tango papa golf'} }, # known WLAN networks to attempt connection to
     'SSID': 'DroneTracker', # SSID to be used if no known nets can be found and local AP started
     'LogFileBase': 'GPSlog', # file name for log file on SD card
     'log_filename': '/sd/log.csv', # file name for log file on SD card

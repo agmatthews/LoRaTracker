@@ -31,7 +31,7 @@ config = {
     'use_Tracker': True, # if true connect to the RockAir Tracker and get position and send data
     'use_WebServer': True, # if true and if network available fire up the local web server
     'use_MQTT': True, # if true and if internet available send data to MQTT server
-    'known_nets': { 'Galilean': {'pwd': 'ijemedoo'}, 'lerdy': {'pwd': 'lerdy0519'}, 'iPhone': {'pwd': 'Passw0rd'} }, # known WLAN networks to attempt connection to
+    'known_nets': { 'Galilean': {'pwd': 'ijemedoo'}, 'lerdy': {'pwd': 'lerdy0519'}, 'iPhone': {'pwd': 'Passw0rd'}, 'tickerg': {'pwd': 'tango papa golf'} }, # known WLAN networks to attempt connection to
     'my_ID': 'CARD', # unique id of this unit - 4 char string
     'TZ_offset_secs': 10 * 60 * 60,  # AEST is +10 hours offset from UTC
     'ntp_source': 'pool.ntp.org', # URL for network time protocol source
